@@ -42,10 +42,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
+      final deviceId = await widget.storage.getOrCreateDeviceId();
       final res = await widget.api.register(
         phone: _phoneCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
+        deviceId: deviceId,
         fullName: _fullNameCtrl.text.trim().isEmpty
             ? null
             : _fullNameCtrl.text.trim(),
@@ -87,6 +89,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: const InputDecoration(labelText: 'Số điện thoại'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Nhập số điện thoại';
+                  final digits = v.trim();
+                  if (digits.length < 8 || digits.length > 20) {
+                    return 'Số điện thoại phải từ 8-20 ký tự';
+                  }
                   return null;
                 },
               ),

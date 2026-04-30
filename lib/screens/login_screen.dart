@@ -39,9 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      final deviceId = await widget.storage.getOrCreateDeviceId();
       final res = await widget.api.login(
         phone: _phoneCtrl.text.trim(),
         password: _passwordCtrl.text,
+        deviceId: deviceId,
       );
 
       await widget.storage.save(token: res.accessToken, user: res.user);
