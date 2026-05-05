@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'auth/auth_api.dart';
@@ -7,14 +10,20 @@ import 'screens/login_screen.dart';
 import 'screens/pin_unlock_screen.dart';
 
 void main() {
-  const apiBaseUrl = String.fromEnvironment(
+  const apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:8081',
   );
+  final defaultBaseUrl = kIsWeb
+      ? 'http://localhost:8081'
+      : (Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081');
+  final apiBaseUrl = apiBaseUrlOverride.isNotEmpty
+      ? apiBaseUrlOverride
+      : defaultBaseUrl;
   // NOTE:
-  // - Android emulator: use http://10.0.2.2:8080
-  // - iOS simulator: http://localhost:8080
-  // - Real device: use your machine LAN IP, e.g. http://192.168.1.10:8080
+  // - Android emulator: use http://10.0.2.2:8081
+  // - iOS simulator: http://localhost:8081
+  // - Real device: use your machine LAN IP, e.g. http://192.168.1.10:8081
 
   final api = AuthApi(baseUrl: apiBaseUrl);
   final storage = AuthStorage();

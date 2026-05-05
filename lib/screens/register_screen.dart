@@ -58,10 +58,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phone: _phoneCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
+        deviceId: deviceId,
         fullName: _fullNameCtrl.text.trim().isEmpty
             ? null
             : _fullNameCtrl.text.trim(),
-        deviceId: deviceId,
         publicKeyPem: publicKeyPem,
       );
 

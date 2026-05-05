@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -7,6 +8,7 @@ import 'auth_models.dart';
 class AuthStorage {
   static const _tokenKey = 'accessToken';
   static const _userKey = 'authUser';
+  static const _deviceIdKey = 'deviceId';
 
   Future<void> save({required String token, required AuthUser user}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,5 +36,25 @@ class AuthStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
+  }
+
+  Future<String> getOrCreateDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_deviceIdKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final id = _generateDeviceId();
+    await prefs.setString(_deviceIdKey, id);
+    return id;
+  }
+
+  String _generateDeviceId() {
+    final rand = Random();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    const maxRand = 1 << 31;
+    final salt = rand.nextInt(maxRand).toUnsigned(32);
+    return 'dev-$now-$salt';
   }
 }
