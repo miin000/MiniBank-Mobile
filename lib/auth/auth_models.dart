@@ -21,6 +21,20 @@ class AuthResponse {
   }
 }
 
+class AuthOtpSendResponse {
+  final bool devMode;
+  final String? otp;
+
+  AuthOtpSendResponse({required this.devMode, required this.otp});
+
+  factory AuthOtpSendResponse.fromJson(Map<String, dynamic> json) {
+    return AuthOtpSendResponse(
+      devMode: (json['devMode'] as bool?) ?? false,
+      otp: json['otp'] as String?,
+    );
+  }
+}
+
 class AuthUser {
   final int id;
   final String type;

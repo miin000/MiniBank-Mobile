@@ -36,7 +36,16 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   http: ^1.2.2
+  image_picker: ^1.1.2
   shared_preferences: ^2.3.2
+
+  uuid: ^4.5.1
+  flutter_secure_storage: ^9.2.2
+  basic_utils: ^5.7.0
+  pointycastle: ^3.9.1
+
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.3
 
 dev_dependencies:
   flutter_test:

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'auth/auth_api.dart';
 import 'auth/auth_storage.dart';
-import 'screens/home_screen.dart';
+import 'security/device_identity.dart';
 import 'screens/login_screen.dart';
+import 'screens/pin_unlock_screen.dart';
 
 void main() {
   const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'http://localhost:8081',
   );
   // NOTE:
   // - Android emulator: use http://10.0.2.2:8080
@@ -17,14 +18,23 @@ void main() {
 
   final api = AuthApi(baseUrl: apiBaseUrl);
   final storage = AuthStorage();
-  runApp(MyApp(api: api, storage: storage));
+  final identity = DeviceIdentity();
+  runApp(MyApp(baseUrl: apiBaseUrl, api: api, storage: storage, identity: identity));
 }
 
 class MyApp extends StatelessWidget {
+  final String baseUrl;
   final AuthApi api;
   final AuthStorage storage;
+  final DeviceIdentity identity;
 
-  const MyApp({super.key, required this.api, required this.storage});
+  const MyApp({
+    super.key,
+    required this.baseUrl,
+    required this.api,
+    required this.storage,
+    required this.identity,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +52,9 @@ class MyApp extends StatelessWidget {
 
           final token = snapshot.data;
           if (token != null && token.isNotEmpty) {
-            return HomeScreen(api: api, storage: storage);
+            return PinUnlockScreen(baseUrl: baseUrl, api: api, storage: storage, identity: identity);
           }
-          return LoginScreen(api: api, storage: storage);
+          return LoginScreen(baseUrl: baseUrl, api: api, storage: storage, identity: identity);
         },
       ),
     );
