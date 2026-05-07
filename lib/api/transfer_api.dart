@@ -29,14 +29,18 @@ class TransferInitiateResponse {
   factory TransferInitiateResponse.fromJson(Map<String, dynamic> json) {
     return TransferInitiateResponse(
       transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
-      transactionCode: (json['transactionCode'] as String?) ?? '',
-      status: (json['status'] as String?) ?? '',
+      transactionCode: json['transactionCode']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
       fromAccountNumber: json['fromAccountNumber']?.toString() ?? '',
       toAccountNumber: json['toAccountNumber']?.toString() ?? '',
       toAccountName: json['toAccountName']?.toString() ?? '',
-      amount: (json['amount'] as String?) ?? '',
-      otpRequired: (json['otpRequired'] as bool?) ?? true,
-      pinRequired: (json['pinRequired'] as bool?) ?? true,
+        amount: json['amount']?.toString() ?? '',
+        otpRequired: (json['otpRequired'] is bool)
+          ? (json['otpRequired'] as bool)
+          : (json['otpRequired']?.toString() == 'true'),
+        pinRequired: (json['pinRequired'] is bool)
+          ? (json['pinRequired'] as bool)
+          : (json['pinRequired']?.toString() == 'true'),
       debugOtp: json['debugOtp'] as String?,
     );
   }
@@ -64,11 +68,11 @@ class TransferConfirmResponse {
   factory TransferConfirmResponse.fromJson(Map<String, dynamic> json) {
     return TransferConfirmResponse(
       transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
-      status: (json['status'] as String?) ?? '',
+      status: json['status']?.toString() ?? '',
       completedAt: json['completedAt'] as String?,
       fromAccountNumber: json['fromAccountNumber']?.toString() ?? '',
       toAccountNumber: json['toAccountNumber']?.toString() ?? '',
-      amount: (json['amount'] as String?) ?? '',
+      amount: json['amount']?.toString() ?? '',
       fromAvailableBalance: json['fromAvailableBalance']?.toString(),
     );
   }

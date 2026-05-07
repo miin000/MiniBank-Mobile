@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -5,6 +6,8 @@ import 'package:http/http.dart' as http;
 import '../auth/auth_storage.dart';
 
 class AuthedApi {
+  static const Duration _requestTimeout = Duration(seconds: 30);
+
   final String baseUrl;
   final AuthStorage storage;
 
@@ -32,7 +35,9 @@ class AuthedApi {
     Map<String, String>? query,
     required T Function(Object? decoded) parser,
   }) async {
-    final res = await http.get(_uri(path, query), headers: await _headers());
+    final res = await http
+      .get(_uri(path, query), headers: await _headers())
+      .timeout(_requestTimeout);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
     }
@@ -45,11 +50,13 @@ class AuthedApi {
     Object? body,
     required T Function(Object? decoded) parser,
   }) async {
-    final res = await http.post(
-      _uri(path),
-      headers: await _headers(jsonBody: true),
-      body: jsonEncode(body),
-    );
+    final res = await http
+        .post(
+          _uri(path),
+          headers: await _headers(jsonBody: true),
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
     }
@@ -62,11 +69,13 @@ class AuthedApi {
     Object? body,
     required T Function(Object? decoded) parser,
   }) async {
-    final res = await http.put(
-      _uri(path),
-      headers: await _headers(jsonBody: true),
-      body: jsonEncode(body),
-    );
+    final res = await http
+        .put(
+          _uri(path),
+          headers: await _headers(jsonBody: true),
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
     }

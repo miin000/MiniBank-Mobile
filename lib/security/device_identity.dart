@@ -1,24 +1,32 @@
 import 'dart:convert';
-import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:basic_utils/basic_utils.dart';
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-/// Provides a stable per-installation device id and an RSA keypair.
+/// Provides a stable per-installation device id and an ECDSA P-256 keypair.
 ///
 /// - `deviceId` is stored in SharedPreferences.
-/// - RSA keys are stored in secure storage (PEM).
+/// - EC key material is stored in secure storage (base64 bytes).
 class DeviceIdentity {
   static const _deviceIdKey = 'deviceId';
 
-  static const _privateKeyPemKey = 'rsaPrivateKeyPem';
-  static const _publicKeyPemKey = 'rsaPublicKeyPem';
+  static const _privateKeyB64Key = 'ecPrivateKeyB64';
+  static const _publicKeyB64Key = 'ecPublicKeyB64';
+
+  // Cleanup legacy RSA keys after migration.
+  static const _legacyPrivateKeyPemKey = 'rsaPrivateKeyPem';
+  static const _legacyPublicKeyPemKey = 'rsaPublicKeyPem';
 
   final FlutterSecureStorage _secureStorage;
+  final Ecdsa _ecdsa = Ecdsa.p256(Sha256());
+
+  EcKeyPair? _cachedKeyPair;
+  String? _cachedPublicKeyPem;
 
   DeviceIdentity({FlutterSecureStorage? secureStorage})
       : _secureStorage = secureStorage ?? const FlutterSecureStorage();
@@ -34,65 +42,136 @@ class DeviceIdentity {
   }
 
   Future<String> getOrCreatePublicKeyPem() async {
-    final existing = await _secureStorage.read(key: _publicKeyPemKey);
-    if (existing != null && existing.trim().isNotEmpty) return existing;
-
-    await _ensureKeyPair();
-    final created = await _secureStorage.read(key: _publicKeyPemKey);
-    if (created == null || created.trim().isEmpty) {
-      throw StateError('Failed to create RSA public key');
+    if (_cachedPublicKeyPem != null && _cachedPublicKeyPem!.trim().isNotEmpty) {
+      return _cachedPublicKeyPem!;
     }
-    return created;
+
+    final keyPair = await _getOrCreateKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    final der = _encodeEcPublicKeyDer(publicKey);
+    final pem = _pemEncode(der, 'PUBLIC KEY');
+    _cachedPublicKeyPem = pem;
+    return pem;
   }
 
-  Future<String> _getOrCreatePrivateKeyPem() async {
-    final existing = await _secureStorage.read(key: _privateKeyPemKey);
-    if (existing != null && existing.trim().isNotEmpty) return existing;
-
-    await _ensureKeyPair();
-    final created = await _secureStorage.read(key: _privateKeyPemKey);
-    if (created == null || created.trim().isEmpty) {
-      throw StateError('Failed to create RSA private key');
+  /// Signs [message] with SHA256withECDSA and returns base64(signature).
+  Future<String> signToBase64(String message) async {
+    try {
+      return _sign(message);
+    } catch (_) {
+      await _resetKeyPair();
+      return _sign(message);
     }
-    return created;
   }
 
-  Future<void> _ensureKeyPair() async {
-    final pub = await _secureStorage.read(key: _publicKeyPemKey);
-    final priv = await _secureStorage.read(key: _privateKeyPemKey);
-    if (pub != null && pub.trim().isNotEmpty && priv != null && priv.trim().isNotEmpty) {
+  Future<void> _resetKeyPair() async {
+    _cachedKeyPair = null;
+    _cachedPublicKeyPem = null;
+    await _deleteKey(_privateKeyB64Key);
+    await _deleteKey(_publicKeyB64Key);
+    await _deleteKey(_legacyPrivateKeyPemKey);
+    await _deleteKey(_legacyPublicKeyPemKey);
+    await _getOrCreateKeyPair();
+  }
+
+  Future<String?> _readKey(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    }
+    return _secureStorage.read(key: key);
+  }
+
+  Future<void> _writeKey(String key, String? value) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      if (value == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, value);
+      }
       return;
     }
-
-    // Generating a 2048-bit RSA keypair can take noticeable CPU time.
-    // Do it on a background isolate to avoid blocking the UI isolate.
-    final pems = await Isolate.run(() {
-      final pair = CryptoUtils.generateRSAKeyPair();
-      final privatePem = CryptoUtils.encodeRSAPrivateKeyToPemPkcs1(
-        pair.privateKey as RSAPrivateKey,
-      );
-      final publicPem = CryptoUtils.encodeRSAPublicKeyToPem(
-        pair.publicKey as RSAPublicKey,
-      );
-      return <String, String>{
-        'private': privatePem,
-        'public': publicPem,
-      };
-    });
-
-    await _secureStorage.write(key: _privateKeyPemKey, value: pems['private']);
-    await _secureStorage.write(key: _publicKeyPemKey, value: pems['public']);
+    await _secureStorage.write(key: key, value: value);
   }
 
-  /// Signs [message] with SHA256withRSA and returns base64(signature).
-  Future<String> signToBase64(String message) async {
-    final privatePem = await _getOrCreatePrivateKeyPem();
-    final privateKey = CryptoUtils.rsaPrivateKeyFromPem(privatePem);
+  Future<void> _deleteKey(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(key);
+      return;
+    }
+    await _secureStorage.delete(key: key);
+  }
 
-    final signer = Signer('SHA-256/RSA');
-    signer.init(true, PrivateKeyParameter<RSAPrivateKey>(privateKey));
-    final sig = signer.generateSignature(Uint8List.fromList(utf8.encode(message))) as RSASignature;
+  Future<String> _sign(String message) async {
+    final keyPair = await _getOrCreateKeyPair();
+    final sig = await _ecdsa.sign(utf8.encode(message), keyPair: keyPair);
     return base64Encode(sig.bytes);
+  }
+
+  Future<EcKeyPair> _getOrCreateKeyPair() async {
+    if (_cachedKeyPair != null) {
+      return _cachedKeyPair!;
+    }
+
+    final privateB64 = await _readKey(_privateKeyB64Key);
+    final publicB64 = await _readKey(_publicKeyB64Key);
+    if (privateB64 != null && privateB64.isNotEmpty && publicB64 != null && publicB64.isNotEmpty) {
+      try {
+        final d = base64Decode(privateB64);
+        final publicPoint = base64Decode(publicB64);
+        if (publicPoint.length != 65 || publicPoint.first != 0x04) {
+          throw StateError('Unsupported EC public key format in storage');
+        }
+        final x = publicPoint.sublist(1, 33);
+        final y = publicPoint.sublist(33, 65);
+
+        _cachedKeyPair = EcKeyPairData(
+          d: d,
+          x: x,
+          y: y,
+          type: KeyPairType.p256,
+        );
+        return _cachedKeyPair!;
+      } catch (_) {
+        await _deleteKey(_privateKeyB64Key);
+        await _deleteKey(_publicKeyB64Key);
+      }
+    }
+
+    await _deleteKey(_legacyPrivateKeyPemKey);
+    await _deleteKey(_legacyPublicKeyPemKey);
+
+    final newKeyPair = await _ecdsa.newKeyPair();
+    final extracted = await newKeyPair.extract();
+    final publicKey = await newKeyPair.extractPublicKey();
+    final publicPoint = Uint8List.fromList([0x04, ...publicKey.x, ...publicKey.y]);
+
+    await _writeKey(_privateKeyB64Key, base64Encode(extracted.d));
+    await _writeKey(_publicKeyB64Key, base64Encode(publicPoint));
+
+    _cachedKeyPair = EcKeyPairData(
+      d: extracted.d,
+      x: publicKey.x,
+      y: publicKey.y,
+      type: KeyPairType.p256,
+    );
+    return _cachedKeyPair!;
+  }
+
+  static Uint8List _encodeEcPublicKeyDer(EcPublicKey publicKey) {
+    return publicKey.toDer();
+  }
+
+  static String _pemEncode(Uint8List der, String label) {
+    final b64 = base64Encode(der);
+    final chunks = <String>[];
+    for (var i = 0; i < b64.length; i += 64) {
+      final end = (i + 64 < b64.length) ? i + 64 : b64.length;
+      chunks.add(b64.substring(i, end));
+    }
+    return '-----BEGIN $label-----\n${chunks.join('\n')}\n-----END $label-----';
   }
 
   /// Generates a short idempotency key suitable for transfers.

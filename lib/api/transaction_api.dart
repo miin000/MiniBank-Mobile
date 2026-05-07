@@ -27,14 +27,14 @@ class TransactionSummary {
   factory TransactionSummary.fromJson(Map<String, dynamic> json) {
     return TransactionSummary(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      direction: (json['direction'] as String?) ?? 'out',
-      amount: (json['amount'] as String?) ?? json['amount']?.toString() ?? '0',
+      direction: json['direction']?.toString() ?? 'out',
+      amount: json['amount']?.toString() ?? '0',
       description: json['description'] as String?,
       counterpartyAccountNumber: json['counterpartyAccountNumber']?.toString(),
       counterpartyName: json['counterpartyName']?.toString(),
-      transactionType: (json['transactionType'] as String?) ?? '',
-      status: (json['status'] as String?) ?? '',
-      createdAt: (json['createdAt'] as String?) ?? '',
+      transactionType: json['transactionType']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
     );
   }
 }

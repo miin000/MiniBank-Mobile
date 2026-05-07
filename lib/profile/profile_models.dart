@@ -14,9 +14,9 @@ class ProfileAccount {
   factory ProfileAccount.fromJson(Map<String, dynamic> json) {
     return ProfileAccount(
       id: (json['id'] as num).toInt(),
-      accountNumber: (json['accountNumber'] as String?) ?? '',
-      accountName: (json['accountName'] as String?) ?? '',
-      status: (json['status'] as String?) ?? '',
+      accountNumber: json['accountNumber']?.toString() ?? '',
+      accountName: json['accountName']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
     );
   }
 }
@@ -54,16 +54,16 @@ class ProfileResponse {
     final accountsJson = (json['accounts'] as List<dynamic>?) ?? const [];
     return ProfileResponse(
       id: (json['id'] as num).toInt(),
-      phone: (json['phone'] as String?) ?? '',
-      email: (json['email'] as String?) ?? '',
-      fullName: json['fullName'] as String?,
-      dob: DateTime.tryParse((json['dob'] as String?) ?? ''),
-      address: json['address'] as String?,
-      status: json['status'] as String?,
-      customerRank: json['customerRank'] as String?,
+      phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      fullName: json['fullName']?.toString(),
+      dob: DateTime.tryParse(json['dob']?.toString() ?? ''),
+      address: json['address']?.toString(),
+      status: json['status']?.toString(),
+      customerRank: json['customerRank']?.toString(),
       hasTransactionPin: (json['hasTransactionPin'] as bool?) ?? false,
       hasPublicKey: (json['hasPublicKey'] as bool?) ?? false,
-      deviceId: json['deviceId'] as String?,
+      deviceId: json['deviceId']?.toString(),
       accounts: accountsJson
           .map((e) => ProfileAccount.fromJson(e as Map<String, dynamic>))
           .toList(),

@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'auth/auth_api.dart';
 import 'auth/auth_storage.dart';
@@ -9,17 +10,21 @@ import 'security/device_identity.dart';
 import 'screens/login_screen.dart';
 import 'screens/pin_unlock_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+
   const apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8081',
+    defaultValue: '',
   );
+  final envBaseUrl = dotenv.env['API_BASE_URL'];
   final defaultBaseUrl = kIsWeb
       ? 'http://localhost:8081'
       : (Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081');
   final apiBaseUrl = apiBaseUrlOverride.isNotEmpty
       ? apiBaseUrlOverride
-      : defaultBaseUrl;
+      : (envBaseUrl != null && envBaseUrl.isNotEmpty ? envBaseUrl : defaultBaseUrl);
   // NOTE:
   // - Android emulator: use http://10.0.2.2:8081
   // - iOS simulator: http://localhost:8081

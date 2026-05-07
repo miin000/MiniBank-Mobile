@@ -26,7 +26,7 @@ class AccountQr {
     return AccountQr(
       accountNumber: json['accountNumber']?.toString() ?? '',
       accountName: json['accountName']?.toString() ?? '',
-      payload: (json['payload'] as String?) ?? '',
+      payload: json['payload']?.toString() ?? '',
     );
   }
 }
@@ -68,7 +68,7 @@ class AccountSuggestions {
 
   factory AccountSuggestions.fromJson(Map<String, dynamic> json) {
     return AccountSuggestions(
-      desired: (json['desired'] as String?) ?? '',
+      desired: json['desired']?.toString() ?? '',
       suggestions: ((json['suggestions'] as List?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),

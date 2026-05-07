@@ -19,7 +19,7 @@ class ProfileAccountSummary {
       id: (json['id'] as num?)?.toInt() ?? 0,
       accountNumber: json['accountNumber']?.toString() ?? '',
       accountName: json['accountName']?.toString() ?? '',
-      status: (json['status'] as String?) ?? '',
+      status: json['status']?.toString() ?? '',
     );
   }
 }

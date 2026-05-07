@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -101,8 +102,17 @@ class _KycScreenState extends State<KycScreen> {
     final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
     final request = http.MultipartRequest('POST', uri)
       ..fields['upload_preset'] = preset
-      ..fields['folder'] = 'minibank/kyc'
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+      ..fields['folder'] = 'minibank/kyc';
+
+    if (kIsWeb) {
+      final bytes = await file.readAsBytes();
+      final filename = file.name.isNotEmpty ? file.name : 'kyc.jpg';
+      request.files.add(
+        http.MultipartFile.fromBytes('file', bytes, filename: filename),
+      );
+    } else {
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+    }
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
