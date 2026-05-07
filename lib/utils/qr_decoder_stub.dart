@@ -1,0 +1,1 @@
+Future<String?> decodeQrWeb(dynamic bytes) async => null;

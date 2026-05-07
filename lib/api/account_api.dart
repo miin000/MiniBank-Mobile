@@ -31,6 +31,47 @@ class AccountQr {
   }
 }
 
+class TransferQrIntent {
+  final int intentId;
+  final String intentToken;
+  final String accountNumber;
+  final String accountName;
+  final String amount;
+  final String status;
+  final String payload;
+  final String expiresAt;
+  final String? claimedAt;
+  final String? completedAt;
+
+  TransferQrIntent({
+    required this.intentId,
+    required this.intentToken,
+    required this.accountNumber,
+    required this.accountName,
+    required this.amount,
+    required this.status,
+    required this.payload,
+    required this.expiresAt,
+    required this.claimedAt,
+    required this.completedAt,
+  });
+
+  factory TransferQrIntent.fromJson(Map<String, dynamic> json) {
+    return TransferQrIntent(
+      intentId: (json['intentId'] as num?)?.toInt() ?? 0,
+      intentToken: json['intentToken']?.toString() ?? '',
+      accountNumber: json['accountNumber']?.toString() ?? '',
+      accountName: json['accountName']?.toString() ?? '',
+      amount: json['amount']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      payload: json['payload']?.toString() ?? '',
+      expiresAt: json['expiresAt']?.toString() ?? '',
+      claimedAt: json['claimedAt']?.toString(),
+      completedAt: json['completedAt']?.toString(),
+    );
+  }
+}
+
 class AccountSummary {
   final String accountNumber;
   final String accountName;
@@ -111,6 +152,29 @@ class AccountApi {
       '/api/mobile/accounts/me/qr',
       query: query,
       parser: (decoded) => AccountQr.fromJson((decoded as Map).cast<String, dynamic>()),
+    );
+  }
+
+  Future<TransferQrIntent> createTransferQr({required String accountNumber, required String amount}) async {
+    return _api.postJson(
+      '/api/mobile/accounts/qr-transfer-intents',
+      body: {'accountNumber': accountNumber, 'amount': amount},
+      parser: (decoded) => TransferQrIntent.fromJson((decoded as Map).cast<String, dynamic>()),
+    );
+  }
+
+  Future<TransferQrIntent> latestTransferQr({required String accountNumber}) async {
+    return _api.getJson(
+      '/api/mobile/accounts/qr-transfer-intents/latest/$accountNumber',
+      parser: (decoded) => TransferQrIntent.fromJson((decoded as Map).cast<String, dynamic>()),
+    );
+  }
+
+  Future<TransferQrIntent> claimTransferQr({required String intentToken}) async {
+    return _api.postJson(
+      '/api/mobile/accounts/qr-transfer-intents/claim',
+      body: {'intentToken': intentToken},
+      parser: (decoded) => TransferQrIntent.fromJson((decoded as Map).cast<String, dynamic>()),
     );
   }
 

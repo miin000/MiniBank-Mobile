@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../api/account_api.dart';
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingSummary = false;
   bool _loadingRecent = false;
   bool _loadingProfile = false;
+  bool _hideBalance = true;
   String? _summaryError;
   String? _recentError;
   String? _profileStatus;
@@ -77,8 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openTransfer() {
-    Navigator.of(context).push(
+  Future<void> _openTransfer() async {
+    final completed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => TransferScreen(
           baseUrl: widget.baseUrl,
@@ -87,10 +89,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    if (completed == true) {
+      await _loadSummary();
+      await _loadRecent();
+    }
   }
 
-  void _openQr() {
-    Navigator.of(context).push(
+  Future<void> _openQr() async {
+    final needsReload = await Navigator.of(context).push<bool?>(
       MaterialPageRoute(
         builder: (_) => QrScreen(
           baseUrl: widget.baseUrl,
@@ -99,6 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    if (needsReload == true && mounted) {
+      await _loadSummary();
+      await _loadRecent();
+    }
   }
 
   void _openKyc() {
@@ -347,13 +358,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Text(
                           summary == null
                               ? (_loadingSummary ? 'Đang tải...' : 'Chưa có dữ liệu')
-                              : '${summary.availableBalance} VND',
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700),
+                              : (_hideBalance ? '•••••• VND' : '${summary.availableBalance} VND'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       IconButton(
-                        onPressed: () => _comingSoon('Ẩn số dư'),
-                        icon: const Icon(Icons.visibility, color: Colors.white70),
+                        onPressed: summary == null
+                            ? null
+                            : () {
+                                setState(() => _hideBalance = !_hideBalance);
+                              },
+                        icon: Icon(
+                          _hideBalance ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70,
+                        ),
                       ),
                     ],
                   ),
@@ -361,9 +383,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton.icon(
                     onPressed: summary == null
                         ? null
-                        : () {
+                        : () async {
+                            await Clipboard.setData(ClipboardData(text: summary.accountNumber));
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Đã sao chép ${summary.accountNumber}')),
+                              SnackBar(content: Text('Đã sao chép STK ${summary.accountNumber}')),
                             );
                           },
                     icon: const Icon(Icons.copy, color: Colors.white70, size: 16),

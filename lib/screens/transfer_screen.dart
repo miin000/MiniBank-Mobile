@@ -16,6 +16,8 @@ class TransferScreen extends StatefulWidget {
 
   final String? prefillToAccountNumber;
   final String? prefillToAccountName;
+  final String? prefillAmount;
+  final int? qrTransferIntentId;
 
   const TransferScreen({
     super.key,
@@ -24,6 +26,8 @@ class TransferScreen extends StatefulWidget {
     required this.identity,
     this.prefillToAccountNumber,
     this.prefillToAccountName,
+    this.prefillAmount,
+    this.qrTransferIntentId,
   });
 
   @override
@@ -65,6 +69,9 @@ class _TransferScreenState extends State<TransferScreen> {
     }
     if (widget.prefillToAccountName != null && widget.prefillToAccountName!.trim().isNotEmpty) {
       _toAccountName = widget.prefillToAccountName!.trim();
+    }
+    if (widget.prefillAmount != null && widget.prefillAmount!.trim().isNotEmpty) {
+      _amountCtrl.text = widget.prefillAmount!.trim();
     }
     _loadFromAccount();
     if (!kIsWeb) {
@@ -247,6 +254,7 @@ class _TransferScreenState extends State<TransferScreen> {
         amount: double.parse(amountInput.replaceAll(',', '.')).toStringAsFixed(2),
         description: desc.isEmpty ? null : desc,
         idempotencyKey: idem,
+        qrTransferIntentId: widget.qrTransferIntentId,
         signatureBase64: signature,
         pin: pin,
       );
@@ -559,6 +567,11 @@ class _TransferScreenState extends State<TransferScreen> {
       setState(() {
         _confirm = res;
       });
+      final shouldReturnHome = await _showSuccessReceipt(res);
+      if (!mounted) return;
+      if (shouldReturnHome == true) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       if (!mounted) return;
       debugPrint('transfer confirm error: $e');
@@ -568,6 +581,53 @@ class _TransferScreenState extends State<TransferScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<bool?> _showSuccessReceipt(TransferConfirmResponse res) async {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Hóa đơn giao dịch'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Mã giao dịch: ${res.transactionId}'),
+                const SizedBox(height: 6),
+                Text('Trạng thái: ${res.status}'),
+                const SizedBox(height: 6),
+                Text('Từ: ${res.fromAccountNumber}'),
+                const SizedBox(height: 6),
+                Text('Đến: ${res.toAccountNumber}'),
+                const SizedBox(height: 6),
+                Text('Số tiền: ${res.amount} VND'),
+                if (res.completedAt != null) ...[
+                  const SizedBox(height: 6),
+                  Text('Thời gian: ${res.completedAt}'),
+                ],
+                if (res.fromAvailableBalance != null) ...[
+                  const SizedBox(height: 6),
+                  Text('Số dư còn lại: ${res.fromAvailableBalance} VND'),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Ở lại'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Về trang chủ'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -653,7 +713,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         if (v.trim().length != 13) return 'Số tài khoản phải đủ 13 số';
                         return null;
                       },
-                      enabled: init == null,
+                      enabled: init == null && widget.qrTransferIntentId == null,
                     ),
                     if (_toAccountName != null && _toAccountName!.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -683,7 +743,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         if (parsed == null || parsed <= 0) return 'Số tiền không hợp lệ';
                         return null;
                       },
-                      enabled: init == null,
+                      enabled: init == null && widget.qrTransferIntentId == null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

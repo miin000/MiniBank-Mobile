@@ -48,6 +48,9 @@ dependencies:
 
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.3
+  flutter_zxing: ^1.9.1
+  image: ^4.0.0
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:

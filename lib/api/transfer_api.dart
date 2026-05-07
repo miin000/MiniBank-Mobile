@@ -90,6 +90,7 @@ class TransferApi {
     required String amount,
     String? description,
     String? idempotencyKey,
+    int? qrTransferIntentId,
     required String signatureBase64,
     required String pin,
   }) async {
@@ -101,6 +102,7 @@ class TransferApi {
         'amount': amount,
         'description': description,
         'idempotencyKey': idempotencyKey,
+        'qrTransferIntentId': qrTransferIntentId,
         'signature': signatureBase64,
         'pin': pin,
       },
