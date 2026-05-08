@@ -94,6 +94,30 @@ class ProfileApi {
     );
   }
 
+  Future<ProfileResponse> updateProfile({
+    String? fullName,
+    DateTime? dob,
+    String? address,
+  }) async {
+    String? dobValue;
+    if (dob != null) {
+      final year = dob.year.toString().padLeft(4, '0');
+      final month = dob.month.toString().padLeft(2, '0');
+      final day = dob.day.toString().padLeft(2, '0');
+      dobValue = '$year-$month-$day';
+    }
+
+    return _api.putJson(
+      '/api/mobile/profile/me',
+      body: {
+        'fullName': fullName,
+        'dob': dobValue,
+        'address': address,
+      },
+      parser: (decoded) => ProfileResponse.fromJson((decoded as Map).cast<String, dynamic>()),
+    );
+  }
+
   Future<void> setOrChangePin({String? oldPin, required String newPin}) async {
     await _api.postJson(
       '/api/mobile/profile/transaction-pin',

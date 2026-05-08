@@ -566,10 +566,14 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() => _navIndex = 0);
             return;
           }
+          if (index == 4) {
+            _openProfile();
+            setState(() => _navIndex = 0);
+            return;
+          }
           final label = switch (index) {
             1 => 'Lịch sử',
             3 => 'Tiện ích',
-            4 => 'Cá nhân',
             _ => 'Tính năng',
           };
           _comingSoon(label);
