@@ -79,6 +79,8 @@ class AccountSummary {
   final String currentBalance;
   final String status;
   final String? customerRank;
+  final String? dailyTransferLimit;
+  final String? dailyReceiveLimit;
 
   AccountSummary({
     required this.accountNumber,
@@ -87,6 +89,8 @@ class AccountSummary {
     required this.currentBalance,
     required this.status,
     required this.customerRank,
+    required this.dailyTransferLimit,
+    required this.dailyReceiveLimit,
   });
 
   factory AccountSummary.fromJson(Map<String, dynamic> json) {
@@ -97,6 +101,8 @@ class AccountSummary {
       currentBalance: json['currentBalance']?.toString() ?? '0',
       status: json['status']?.toString() ?? '',
       customerRank: json['customerRank']?.toString(),
+      dailyTransferLimit: json['dailyTransferLimit']?.toString(),
+      dailyReceiveLimit: json['dailyReceiveLimit']?.toString(),
     );
   }
 }
