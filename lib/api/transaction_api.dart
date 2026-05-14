@@ -57,4 +57,48 @@ class TransactionApi {
       },
     );
   }
+
+  Future<List<TransactionSummary>> history({
+    int limit = 20,
+    int page = 0,
+    String direction = 'all',
+    String? status,
+    String? query,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      'page': '$page',
+      'direction': direction,
+    };
+    if (status != null && status.isNotEmpty) {
+      params['status'] = status;
+    }
+    if (query != null && query.isNotEmpty) {
+      params['q'] = query;
+    }
+
+    return _api.getJson(
+      '/api/mobile/transactions/history',
+      query: params,
+      parser: (decoded) {
+        final list = (decoded as List).cast<Object?>();
+        return list
+            .map((e) => TransactionSummary.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(growable: false);
+      },
+    );
+  }
+
+  Future<List<TransactionSummary>> pending({int limit = 20}) async {
+    return _api.getJson(
+      '/api/mobile/transactions/pending',
+      query: {'limit': '$limit'},
+      parser: (decoded) {
+        final list = (decoded as List).cast<Object?>();
+        return list
+            .map((e) => TransactionSummary.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(growable: false);
+      },
+    );
+  }
 }

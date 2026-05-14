@@ -14,6 +14,7 @@ import 'kyc_screen.dart';
 import 'profile_screen.dart';
 import 'qr_screen.dart';
 import 'transfer_screen.dart';
+import 'transaction_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String baseUrl;
@@ -130,6 +131,17 @@ class _HomeScreenState extends State<HomeScreen> {
           baseUrl: widget.baseUrl,
           storage: widget.storage,
           identity: widget.identity,
+        ),
+      ),
+    );
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TransactionHistoryScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
         ),
       ),
     );
@@ -568,6 +580,11 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           if (index == 4) {
             _openProfile();
+            setState(() => _navIndex = 0);
+            return;
+          }
+          if (index == 1) {
+            _openHistory();
             setState(() => _navIndex = 0);
             return;
           }
