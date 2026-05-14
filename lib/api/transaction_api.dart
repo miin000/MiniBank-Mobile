@@ -68,14 +68,19 @@ class TransactionApi {
   }
 
   Future<List<TransactionSummary>> history({
-    String? direction,
+    int? limit,
+    int? page,
+    String direction = 'all',
     String? status,
     String? query,
     DateTime? from,
     DateTime? to,
   }) async {
-    final params = <String, String>{};
-    if (direction != null && direction.isNotEmpty) params['direction'] = direction;
+    final params = <String, String>{
+      'direction': direction,
+    };
+    if (limit != null) params['limit'] = '$limit';
+    if (page != null) params['page'] = '$page';
     if (status != null && status.isNotEmpty) params['status'] = status;
     if (query != null && query.isNotEmpty) params['q'] = query;
     if (from != null) params['from'] = from.toUtc().toIso8601String();
@@ -91,5 +96,9 @@ class TransactionApi {
             .toList(growable: false);
       },
     );
+  }
+
+  Future<List<TransactionSummary>> pending({int? limit, int? page}) async {
+    return history(limit: limit, page: page, status: 'pending');
   }
 }

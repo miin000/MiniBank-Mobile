@@ -14,8 +14,8 @@ import 'kyc_screen.dart';
 import 'profile_screen.dart';
 import 'qr_screen.dart';
 import 'services_screen.dart';
-import 'transaction_history_screen.dart';
 import 'transfer_screen.dart';
+import 'transaction_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String baseUrl;
@@ -137,6 +137,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _openServices() => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ServicesScreen(
           baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TransactionHistoryScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+  }
 
   void _openAccountSetup() async {
     final created = await Navigator.of(context).push<bool>(
