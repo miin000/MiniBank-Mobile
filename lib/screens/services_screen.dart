@@ -9,6 +9,7 @@ import '../auth/auth_storage.dart';
 import '../security/device_identity.dart';
 import '../widgets/loan_list_widget.dart';
 import '../widgets/saving_list_widget.dart';
+import 'contract_list_screen.dart';
 import 'create_loan_screen.dart';
 import 'create_saving_screen.dart';
 import 'create_service_request_screen.dart';
@@ -221,6 +222,17 @@ class _ServicesScreenState extends State<ServicesScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ExpenseManagementScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+  }
+
+  void _openContractsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ContractListScreen(
           baseUrl: widget.baseUrl,
           storage: widget.storage,
         ),
@@ -628,8 +640,8 @@ class _ServicesScreenState extends State<ServicesScreen>
               key: _assetSectionKey,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _sectionHeader('Tài sản của tôi',
-                    action: 'Xem chi tiêu',
-                  onAction: _openExpenseScreen),
+                    action: 'Hop dong',
+                  onAction: _openContractsScreen),
                 // Tab bar
                 Container(
                   decoration: BoxDecoration(
