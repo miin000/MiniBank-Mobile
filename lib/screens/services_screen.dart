@@ -7,9 +7,7 @@ import '../api/saving_api.dart';
 import '../api/service_request_api.dart';
 import '../auth/auth_storage.dart';
 import '../security/device_identity.dart';
-import '../widgets/loan_list_widget.dart';
-import '../widgets/saving_list_widget.dart';
-import 'contract_list_screen.dart';
+import 'asset_management_screen.dart';
 import 'create_loan_screen.dart';
 import 'create_saving_screen.dart';
 import 'create_service_request_screen.dart';
@@ -51,15 +49,12 @@ class ServicesScreen extends StatefulWidget {
   State<ServicesScreen> createState() => _ServicesScreenState();
 }
 
-class _ServicesScreenState extends State<ServicesScreen>
-    with SingleTickerProviderStateMixin {
+class _ServicesScreenState extends State<ServicesScreen> {
   late LoanApi _loanApi;
   late SavingApi _savingApi;
   late ServiceRequestApi _serviceRequestApi;
   late ScrollController _scrollController;
-  late TabController _assetTabController;
 
-  final GlobalKey _assetSectionKey = GlobalKey();
   final GlobalKey _requestSectionKey = GlobalKey();
 
   List<Loan> _loans = [];
@@ -78,7 +73,6 @@ class _ServicesScreenState extends State<ServicesScreen>
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    _assetTabController = TabController(length: 2, vsync: this);
 
     final api = AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _loanApi = LoanApi(api: api);
@@ -90,7 +84,6 @@ class _ServicesScreenState extends State<ServicesScreen>
   @override
   void dispose() {
     _scrollController.dispose();
-    _assetTabController.dispose();
     super.dispose();
   }
 
@@ -98,15 +91,6 @@ class _ServicesScreenState extends State<ServicesScreen>
     _loadLoans();
     _loadSavings();
     _loadServiceRequests();
-  }
-
-  void _scrollTo(GlobalKey key) {
-    final ctx = key.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(ctx,
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeInOutCubic,
-        alignment: 0.05);
   }
 
   Future<void> _loadLoans() async {
@@ -229,15 +213,19 @@ class _ServicesScreenState extends State<ServicesScreen>
     );
   }
 
-  void _openContractsScreen() {
-    Navigator.of(context).push(
+  Future<void> _openAssetManagementScreen() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ContractListScreen(
+        builder: (_) => AssetManagementScreen(
           baseUrl: widget.baseUrl,
           storage: widget.storage,
+          identity: widget.identity,
         ),
       ),
     );
+    if (!mounted) return;
+    _loadLoans();
+    _loadSavings();
   }
 
   Widget _statCard({
@@ -563,7 +551,7 @@ class _ServicesScreenState extends State<ServicesScreen>
               subtitle: 'Sổ tiết kiệm, khoản vay và chi tiết',
               icon: Icons.account_balance_wallet_outlined,
               colors: _C.blueGrad,
-              onTap: () => _scrollTo(_assetSectionKey),
+              onTap: _openAssetManagementScreen,
             ),
             const SizedBox(height: 10),
             _gradientCard(
@@ -636,67 +624,6 @@ class _ServicesScreenState extends State<ServicesScreen>
             const SizedBox(height: 24),
 
             // ── Asset section (Savings + Loans tabbed) ─────────────────────
-            Container(
-              key: _assetSectionKey,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _sectionHeader('Tài sản của tôi',
-                    action: 'Hop dong',
-                  onAction: _openContractsScreen),
-                // Tab bar
-                Container(
-                  decoration: BoxDecoration(
-                      color: _C.border.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: TabBar(
-                    controller: _assetTabController,
-                    indicator: BoxDecoration(
-                        color: _C.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 8, offset: const Offset(0, 2))
-                        ]),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: _C.textPrimary,
-                    unselectedLabelColor: _C.textSecondary,
-                    labelStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                    unselectedLabelStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w500),
-                    dividerColor: Colors.transparent,
-                    tabs: [
-                      Tab(text: 'Tiết kiệm  (${_savings.length})'),
-                      Tab(text: 'Khoản vay  (${_loans.length})'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  child: ListenableBuilder(
-                    listenable: _assetTabController,
-                    builder: (_, __) {
-                      if (_assetTabController.index == 0) {
-                        return SavingListWidget(
-                          savings: _savings,
-                          loading: _loadingSavings,
-                          error: _savingsError,
-                          onRefresh: _loadSavings,
-                        );
-                      }
-                      return LoanListWidget(
-                        loans: _loans,
-                        loading: _loadingLoans,
-                        error: _loansError,
-                        onRefresh: _loadLoans,
-                      );
-                    },
-                  ),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 24),
 
             // ── Service requests section ───────────────────────────────────
             Container(
@@ -769,3 +696,4 @@ class _ServicesScreenState extends State<ServicesScreen>
     );
   }
 }
+

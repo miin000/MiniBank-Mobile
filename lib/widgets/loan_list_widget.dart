@@ -7,8 +7,17 @@ class LoanListWidget extends StatelessWidget {
   final String? error;
   final VoidCallback onRefresh;
   final bool embedded;
+  final ValueChanged<Loan>? onTap;
 
-  const LoanListWidget({super.key, required this.loans, required this.loading, required this.error, required this.onRefresh, this.embedded = true});
+  const LoanListWidget({
+    super.key,
+    required this.loans,
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
+    this.embedded = true,
+    this.onTap,
+  });
 
   String _formatCurrency(String amount) {
     try {
@@ -44,52 +53,68 @@ class LoanListWidget extends StatelessWidget {
   Widget _loanCard(Loan loan) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Số hiệu: ${loan.code}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 4),
-                    Text('Gốc vay: ${_formatCurrency(loan.approvedAmount)} VND', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap == null ? null : () => onTap!(loan),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Số hiệu: ${loan.code}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text('Gốc vay: ${_formatCurrency(loan.approvedAmount)} VND', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: _getStatusColor(loan.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                    child: Text(loan.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(loan.status))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Gốc còn lại', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('${_formatCurrency(loan.outstandingPrincipal)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Lãi còn lại', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('${_formatCurrency(loan.outstandingInterest)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ],
+              ),
+              if (loan.nextDueDate != null) ...[
+                const SizedBox(height: 12),
+                Text('Ngày trả tiếp theo: ${_formatDate(loan.nextDueDate)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+              if (onTap != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: const [
+                    Text('Xem chi tiet', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                    SizedBox(width: 4),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.blue),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: _getStatusColor(loan.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                  child: Text(loan.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(loan.status))),
-                ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Gốc còn lại', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    Text('${_formatCurrency(loan.outstandingPrincipal)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Lãi còn lại', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    Text('${_formatCurrency(loan.outstandingInterest)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              ],
-            ),
-            if (loan.nextDueDate != null) ...[
-              const SizedBox(height: 12),
-              Text('Ngày trả tiếp theo: ${_formatDate(loan.nextDueDate)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             ],
-          ],
+          ),
         ),
       ),
     );

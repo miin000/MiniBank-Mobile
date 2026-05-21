@@ -7,8 +7,17 @@ class SavingListWidget extends StatelessWidget {
   final String? error;
   final VoidCallback onRefresh;
   final bool embedded;
+  final ValueChanged<Saving>? onTap;
 
-  const SavingListWidget({super.key, required this.savings, required this.loading, required this.error, required this.onRefresh, this.embedded = true});
+  const SavingListWidget({
+    super.key,
+    required this.savings,
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
+    this.embedded = true,
+    this.onTap,
+  });
 
   String _formatCurrency(String amount) {
     try {
@@ -44,37 +53,53 @@ class SavingListWidget extends StatelessWidget {
   Widget _savingCard(Saving saving) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Số hiệu: ${saving.code}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 4),
-              Text('Tiền gốc: ${_formatCurrency(saving.principalAmount)} VND', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap == null ? null : () => onTap!(saving),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Số hiệu: ${saving.code}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Text('Tiền gốc: ${_formatCurrency(saving.principalAmount)} VND', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ]),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: _getStatusColor(saving.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                child: Text(saving.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(saving.status))),
+              ),
             ]),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: _getStatusColor(saving.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-              child: Text(saving.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(saving.status))),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Lãi tính được', style: TextStyle(fontSize: 11, color: Colors.grey)),
-              Text('${_formatCurrency(saving.accruedInterestAmount)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            ])),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Lãi đã trả', style: TextStyle(fontSize: 11, color: Colors.grey)),
-              Text('${_formatCurrency(saving.postedInterestAmount)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            ])),
-          ]),
-          if (saving.maturityDate != null) ...[
             const SizedBox(height: 12),
-            Text('Ngày đáo hạn: ${_formatDate(saving.maturityDate)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ]),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Lãi tính được', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('${_formatCurrency(saving.accruedInterestAmount)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              ])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Lãi đã trả', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('${_formatCurrency(saving.postedInterestAmount)} VND', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              ])),
+            ]),
+            if (saving.maturityDate != null) ...[
+              const SizedBox(height: 12),
+              Text('Ngày đáo hạn: ${_formatDate(saving.maturityDate)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+            if (onTap != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const [
+                  Text('Xem chi tiet', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                  SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 16, color: Colors.blue),
+                ],
+              ),
+            ],
+          ]),
+        ),
       ),
     );
   }

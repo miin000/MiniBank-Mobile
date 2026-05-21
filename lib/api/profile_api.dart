@@ -118,6 +118,26 @@ class ProfileApi {
     );
   }
 
+  Future<void> uploadDocument({
+    required String documentType,
+    required String fileUrl,
+    String? fileName,
+    String? mimeType,
+    String? note,
+  }) async {
+    await _api.postJson(
+      '/api/mobile/profile/documents',
+      body: {
+        'documentType': documentType,
+        'fileUrl': fileUrl,
+        if (fileName != null) 'fileName': fileName,
+        if (mimeType != null) 'mimeType': mimeType,
+        if (note != null) 'note': note,
+      },
+      parser: (_) => null,
+    );
+  }
+
   Future<void> setOrChangePin({String? oldPin, required String newPin}) async {
     await _api.postJson(
       '/api/mobile/profile/transaction-pin',
