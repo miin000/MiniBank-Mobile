@@ -99,6 +99,18 @@ class TransactionApi {
   }
 
   Future<List<TransactionSummary>> pending({int? limit, int? page}) async {
-    return history(limit: limit, page: page, status: 'pending');
+    final params = <String, String>{};
+    if (limit != null) params['limit'] = '$limit';
+
+    return _api.getJson(
+      '/api/mobile/transactions/pending',
+      query: params,
+      parser: (decoded) {
+        final list = (decoded as List).cast<Object?>();
+        return list
+            .map((e) => TransactionSummary.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(growable: false);
+      },
+    );
   }
 }
