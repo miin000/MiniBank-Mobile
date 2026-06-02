@@ -50,6 +50,15 @@ class SavingListWidget extends StatelessWidget {
     return Colors.grey;
   }
 
+  String _statusLabel(String status) {
+    final lowerStatus = status.toLowerCase();
+    if (lowerStatus.contains('active') || lowerStatus.contains('open')) return 'Hoạt động';
+    if (lowerStatus.contains('pending') || lowerStatus.contains('processing') || lowerStatus.contains('submitted')) return 'Chờ duyệt';
+    if (lowerStatus.contains('closed') || lowerStatus.contains('completed')) return 'Đã đóng';
+    if (lowerStatus.contains('rejected')) return 'Từ chối';
+    return status;
+  }
+
   Widget _savingCard(Saving saving) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -69,7 +78,7 @@ class SavingListWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(color: _getStatusColor(saving.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                child: Text(saving.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(saving.status))),
+                child: Text(_statusLabel(saving.status), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(saving.status))),
               ),
             ]),
             const SizedBox(height: 12),

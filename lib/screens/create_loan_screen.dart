@@ -8,13 +8,14 @@ import 'package:http/http.dart' as http;
 
 import '../api/account_api.dart';
 import '../api/authed_api.dart';
+import '../api/contract_api.dart';
 import '../api/loan_api.dart';
 import '../api/profile_api.dart';
 import '../auth/auth_storage.dart';
 import '../config/app_config.dart';
 import '../security/device_identity.dart';
 
-// ??? Design tokens ????????????????????????????????????????????????????????????
+// Design tokens
 class _C {
   static const bg          = Color(0xFFF7F8FC);
   static const surface     = Colors.white;
@@ -41,7 +42,7 @@ class _C {
   static const l2TextW = Colors.white;
 }
 
-// ??? Data models ??????????????????????????????????????????????????????????????
+// Data models
 class _MatrixRow {
   final String label;
   final double amount;
@@ -57,10 +58,10 @@ class _LoanSel {
 }
 
 const _lRows = [
-  _MatrixRow('< 50 tri?u',      30_000_000),
-  _MatrixRow('50 - 200 tri?u',  100_000_000),
-  _MatrixRow('200 - 500 tri?u', 350_000_000),
-  _MatrixRow('> 500 tri?u',     1_000_000_000),
+  _MatrixRow('< 50 triệu',      30_000_000),
+  _MatrixRow('50 - 200 triệu',  100_000_000),
+  _MatrixRow('200 - 500 triệu', 350_000_000),
+  _MatrixRow('> 500 triệu',     1_000_000_000),
 ];
 const _lCols = [6, 12, 24, 36, 60];
 const _lRates = [
@@ -70,7 +71,7 @@ const _lRates = [
   [10.0,11.0, 12.0, 13.0, 14.0],
 ];
 
-// ??? Document descriptor ??????????????????????????????????????????????????????
+// Document descriptor
 class _DocField {
   final String id;
   final String title;
@@ -79,7 +80,7 @@ class _DocField {
   _DocField(this.id, this.title, this.subtitle, {this.required = true});
 }
 
-// ??? Screen ???????????????????????????????????????????????????????????????????
+// Screen
 class CreateLoanScreen extends StatefulWidget {
   final String baseUrl;
   final AuthStorage storage;
@@ -98,6 +99,7 @@ class CreateLoanScreen extends StatefulWidget {
 
 class _CreateLoanScreenState extends State<CreateLoanScreen> {
   late LoanApi _loanApi;
+  late ContractApi _contractApi;
   late ProfileApi _profileApi;
   late AccountApi _accountApi;
 
@@ -107,12 +109,12 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
 
   // Pre-filled user info (replace with real fetch from profile service)
   final Map<String, String> _user = {
-    'fullName'  : 'Nguy?n Van An',
+    'fullName'  : 'Nguyễn Văn An',
     'dob'       : '15/05/1990',
     'citizenId' : '034190012345',
     'phone'     : '0912 345 678',
     'email'     : 'nguyenvanan@gmail.com',
-    'address'   : '123 Du?ng L�ng, D?ng Da, H� N?i',
+    'address'   : '123 Đường Láng, Đống Đa, Hà Nội',
   };
 
   // ?? Step 1: Personal / family info ??
@@ -150,30 +152,37 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
   final Map<String, bool> _uploading       = {};
 
   bool _submitting = false;
+  bool _agreementAccepted = false;
+  bool _sendingOtp = false;
+  ContractTemplateSummary? _contractTemplate;
+  String? _contractTemplateCode;
+  String? _contractError;
+  String? _devOtpHint;
+  final _otpCtrl = TextEditingController();
   final _pageCtrl  = PageController();
 
   // ??? Document list builders ??????????????????????????????????????????????
   List<_DocField> get _docs {
     return [
       // Identity - always required
-      _DocField('cccd_front',  '?nh CCCD m?t tru?c',   'JPG/PNG � t?i da 5MB'),
-      _DocField('cccd_back',   '?nh CCCD m?t sau',     'JPG/PNG � t?i da 5MB'),
+      _DocField('cccd_front',  'Ảnh CCCD mặt trước',   'JPG/PNG, tối đa 5MB'),
+      _DocField('cccd_back',   'Ảnh CCCD mặt sau',     'JPG/PNG, tối đa 5MB'),
       // Income proof - always required
-      _DocField('payslip',     'Sao k� luong / b?ng luong 3 th�ng g?n nh?t',
-                               'PDF ho?c JPG/PNG'),
-      _DocField('bank_stmt',   'Sao k� ng�n h�ng 6 th�ng g?n nh?t',
-                               'PDF t? ng�n h�ng', required: false),
+      _DocField('payslip',     'Sao kê lương / bảng lương 3 tháng gần nhất',
+               'PDF hoặc JPG/PNG'),
+      _DocField('bank_stmt',   'Sao kê ngân hàng 6 tháng gần nhất',
+               'PDF từ ngân hàng', required: false),
       // Secured-only
       if (_loanType == 'secured') ...[
-        _DocField('coll_title','Gi?y t? t�i s?n th? ch?p',
-                               'S? d? / dang k� xe / h?p d?ng mua b�n'),
-        _DocField('coll_photo','?nh th?c t? t�i s?n th? ch?p',
-                               'JPG/PNG � ch?p r� n�t', required: false),
+        _DocField('coll_title','Giấy tờ tài sản thế chấp',
+                   'Sổ đỏ / đăng ký xe / hợp đồng mua bán'),
+        _DocField('coll_photo','Ảnh thực tế tài sản thế chấp',
+                   'JPG/PNG, chụp rõ nét', required: false),
       ],
       // Unsecured optional support docs
       if (_loanType == 'unsecured')
-        _DocField('work_cert', 'X�c nh?n c�ng t�c / H?p d?ng lao d?ng',
-                               'Tang t? l? ph� duy?t', required: false),
+        _DocField('work_cert', 'Xác nhận công tác / Hợp đồng lao động',
+                   'Tăng tỷ lệ phê duyệt', required: false),
     ];
   }
 
@@ -185,6 +194,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
   void initState() {
     super.initState();
     _loanApi = LoanApi(api: AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage));
+    _contractApi = ContractApi(api: AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage));
     _profileApi = ProfileApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _accountApi = AccountApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _loadProfile();
@@ -198,19 +208,20 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     _amountCtrl.dispose();
     _companyCtrl.dispose(); _incomeCtrl.dispose(); _otherIncomeCtrl.dispose();
     _purposeCtrl.dispose(); _collDescCtrl.dispose(); _collValCtrl.dispose();
+    _otpCtrl.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
 
   // ??? Helpers ?????????????????????????????????????????????????????????????
   String _fmtMoney(double v) {
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(1).replaceAll('.0', '')} t?';
-    if (v >= 1e6) return '${(v / 1e6).round()} tri?u';
+    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(1).replaceAll('.0', '')} tỷ';
+    if (v >= 1e6) return '${(v / 1e6).round()} triệu';
     return v.round().toString();
   }
 
   String _fmtFull(double v) =>
-      '${v.round().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')}?';
+      '${v.round().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')} ₫';
 
   Future<void> _loadProfile() async {
     try {
@@ -241,7 +252,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
         if (accounts.isEmpty) {
           _disbAccountId = null;
           _repayAccountId = null;
-          _accountsError = 'B?n chua c� t�i kho?n d? dang k� vay.';
+          _accountsError = 'Bạn chưa có tài khoản để đăng ký vay.';
         } else {
           _disbAccountId ??= accounts.first.id;
           _repayAccountId ??= accounts.length > 1 ? accounts[1].id : accounts.first.id;
@@ -285,6 +296,38 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
       });
     } finally {
       if (mounted) setState(() => _loadingLoanProducts = false);
+    }
+  }
+
+  String _loanContractTemplateCode() =>
+      _loanType == 'secured' ? 'LOAN_MORTGAGE' : 'LOAN_CREDIT';
+
+  Future<void> _loadContractTemplate() async {
+    final code = _loanContractTemplateCode();
+    if (_contractTemplateCode == code && _contractTemplate != null) return;
+    setState(() {
+      _contractTemplateCode = code;
+      _contractTemplate = null;
+      _contractError = null;
+      _agreementAccepted = false;
+      _devOtpHint = null;
+      _otpCtrl.clear();
+    });
+    try {
+      ContractTemplateSummary tpl;
+      try {
+        tpl = await _contractApi.getActiveTemplateByCode(code);
+      } catch (_) {
+        final legacyCode = _loanType == 'secured'
+            ? 'SECURED_LOAN_CONTRACT'
+            : 'UNSECURED_LOAN_CONTRACT';
+        tpl = await _contractApi.getActiveTemplateByCode(legacyCode);
+      }
+      if (!mounted) return;
+      setState(() => _contractTemplate = tpl);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _contractError = e.toString());
     }
   }
 
@@ -363,6 +406,9 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
   }
 
   void _goStep(int step) {
+    if (step == 4) {
+      _loadContractTemplate();
+    }
     setState(() => _step = step);
     _pageCtrl.animateToPage(step,
         duration: const Duration(milliseconds: 280), curve: Curves.easeInOut);
@@ -401,7 +447,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           filename: picked.name.isNotEmpty ? picked.name : '$docId',
         ));
       } else {
-        throw Exception('Kh�ng d?c du?c file');
+        throw Exception('Không đọc được file');
       }
       final res  = await http.Response.fromStream(await request.send());
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -411,36 +457,74 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('L?i t?i l�n: $e'), backgroundColor: _C.error));
+        SnackBar(content: Text('Lỗi tải lên: $e'), backgroundColor: _C.error));
     } finally {
       if (mounted) setState(() { _uploading[docId] = false; });
     }
   }
 
   // ??? Submit ??????????????????????????????????????????????????????????????
+  Future<void> _sendContractOtp() async {
+    setState(() => _sendingOtp = true);
+    try {
+      if (!_agreementAccepted) {
+        throw Exception('Vui lòng tích chọn đã đọc và chấp nhận hợp đồng');
+      }
+      if (_contractTemplate == null) {
+        throw Exception(_contractError ?? 'Chưa tải được hợp đồng active');
+      }
+      final res = await _contractApi.sendContractOtp();
+      if (!mounted) return;
+      setState(() {
+        _devOtpHint = res.otp;
+        if (res.devMode && res.otp != null && res.otp!.isNotEmpty) {
+          _otpCtrl.text = res.otp!;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP ký hợp đồng đã được gửi.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: _C.error));
+    } finally {
+      if (mounted) setState(() => _sendingOtp = false);
+    }
+  }
+
   Future<void> _submit() async {
     setState(() => _submitting = true);
     try {
       final amount = _enteredAmount();
       if (_sel == null || amount == null) {
-        throw Exception('Vui l�ng ch?n k? h?n v� nh?p s? ti?n vay');
+        throw Exception('Vui lòng chọn kỳ hạn và nhập số tiền vay');
       }
       if (_disbAccountId == null || _repayAccountId == null) {
-        throw Exception('Vui l�ng ch?n t�i kho?n gi?i ng�n v� ho�n tr?');
+        throw Exception('Vui lòng chọn tài khoản giải ngân và hoàn trả');
       }
       if (_loadingLoanProducts) {
-        throw Exception('Dang t?i s?n ph?m vay, vui l�ng th? l?i');
+        throw Exception('Đang tải sản phẩm vay, vui lòng thử lại');
       }
       if (_loanProducts.isEmpty) {
-        throw Exception(_loanProductsError ?? 'Chua c� s?n ph?m vay');
+        throw Exception(_loanProductsError ?? 'Chưa có sản phẩm vay');
       }
       final product = _selectedLoanProduct(amount, _sel!.months);
       if (product == null) {
-        throw Exception('Kh�ng t�m th?y s?n ph?m vay ph� h?p v?i s? ti?n/k? h?n d� ch?n');
+        throw Exception('Không tìm thấy sản phẩm vay phù hợp với số tiền/kỳ hạn đã chọn');
       }
       final deps = int.tryParse(_dependentsCtrl.text.trim());
       final collateralValue = double.tryParse(_collValCtrl.text.trim().replaceAll(RegExp(r'[^\d.]'), ''));
-      await _loanApi.applyForLoan(
+      if (_contractTemplate == null) {
+        throw Exception(_contractError ?? 'Chưa tải được hợp đồng active');
+      }
+      if (!_agreementAccepted) {
+        throw Exception('Vui lòng đọc và chấp nhận hợp đồng vay');
+      }
+      final otp = _otpCtrl.text.trim();
+      if (otp.length != 6) throw Exception('OTP phải gồm 6 chữ số');
+
+      final application = await _loanApi.applyForLoan(
         loanProductId         : product.id,
         disbursementAccountId : _disbAccountId!,
         repaymentAccountId    : _repayAccountId!,
@@ -463,12 +547,20 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
         housingStatus         : _housingStatus.isNotEmpty ? _housingStatus : null,
         mailingAddress        : _mailAddrCtrl.text.trim().isNotEmpty ? _mailAddrCtrl.text.trim() : null,
       );
+      await _contractApi.acceptContract(
+        referenceType: 'loan_application',
+        referenceId: application.id,
+        templateCode: _contractTemplate!.code.isNotEmpty
+            ? _contractTemplate!.code
+            : _loanContractTemplateCode(),
+        otpCode: otp,
+      );
       if (!mounted) return;
       _goStep(5);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('L?i: $e'), backgroundColor: _C.error));
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: _C.error));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -491,7 +583,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           },
         ),
         title: Text(
-          _step == 0 ? 'Dang k� vay v?n' : _stepTitle(_step),
+          _step == 0 ? 'Đăng ký vay vốn' : _stepTitle(_step),
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _C.primary),
         ),
         bottom: _step > 0 && _step < 5
@@ -522,11 +614,11 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
   }
 
   String _stepTitle(int s) => switch (s) {
-    1 => 'Th�ng tin c� nh�n',
-    2 => 'Ngh? nghi?p & kho?n vay',
-    3 => 'T�i li?u x�c minh',
-    4 => 'X�c nh?n h? so',
-    _ => 'Ho�n t?t',
+    1 => 'Thông tin cá nhân',
+    2 => 'Nghề nghiệp & khoản vay',
+    3 => 'Tài liệu xác minh',
+    4 => 'Xác nhận hồ sơ',
+    _ => 'Hoàn tất',
   };
 
   // ??? Step 0: Rate matrix ??????????????????????????????????????????????????
@@ -542,7 +634,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Ch?n k? h?n v� nh?p s? ti?n vay d? xem l�i su?t',
+        const Text('Chọn kỳ hạn và nhập số tiền vay để xem lãi suất',
             style: TextStyle(fontSize: 13, color: _C.secondary)),
         const SizedBox(height: 12),
         TextField(
@@ -551,7 +643,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (_) => setState(() {}),
           style: const TextStyle(fontSize: 13),
-          decoration: _inputDeco('Nh?p s? ti?n vay (VND)'),
+          decoration: _inputDeco('Nhập số tiền vay (VND)'),
         ),
         const SizedBox(height: 12),
         Row(children: [
@@ -565,7 +657,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
         _buildRateTable(),
         const SizedBox(height: 16),
         if (_sel != null && enteredAmount != null) ...[
-          _sectionHeader(Icons.inventory_2_outlined, 'San pham vay dang hoat dong'),
+          _sectionHeader(Icons.inventory_2_outlined, 'Sản phẩm vay đang hoạt động'),
           if (candidates.isEmpty)
             Container(
               width: double.infinity,
@@ -576,7 +668,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
                 border: Border.all(color: _C.error.withValues(alpha: 0.25)),
               ),
               child: const Text(
-                'Khong co san pham vay nao phu hop voi so tien va ky han da chon.',
+                'Không có sản phẩm vay nào phù hợp với số tiền và kỳ hạn đã chọn.',
                 style: TextStyle(fontSize: 12, color: _C.error),
               ),
             )
@@ -603,11 +695,11 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
                             children: [
                               Text('${p.name} (${p.code})', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primary)),
                               const SizedBox(height: 2),
-                              Text('${p.loanType} � ${p.minTermMonths}-${p.maxTermMonths} thang', style: const TextStyle(fontSize: 11, color: _C.secondary)),
+                              Text('${p.loanType} · ${p.minTermMonths}-${p.maxTermMonths} tháng', style: const TextStyle(fontSize: 11, color: _C.secondary)),
                             ],
                           ),
                         ),
-                        Text('${_toPercentRate(p.baseInterestRate).toStringAsFixed(2)}%/nam', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.blueDark)),
+                        Text('${_toPercentRate(p.baseInterestRate).toStringAsFixed(2)}%/năm', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.blueDark)),
                       ],
                     ),
                   ),
@@ -628,14 +720,14 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: canContinue ? () => _goStep(1) : null,
-              child: const Text('Ti?p t?c dang k� vay v?n',
+                child: const Text('Tiếp tục đăng ký vay vốn',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
         ] else if (_sel != null) ...[
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Text('Vui l�ng nh?p s? ti?n vay d? t�nh l�i v� ti?p t?c.',
+            child: Text('Vui lòng nhập số tiền vay để tính lãi và tiếp tục.',
                 style: TextStyle(fontSize: 11, color: _C.error)),
           ),
         ],
@@ -660,7 +752,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           TableRow(
             decoration: const BoxDecoration(color: Color(0xFFF1F3F9)),
             children: [
-              _thCell('S? ti?n', isFirst: true),
+              _thCell('Số tiền', isFirst: true),
               ..._lCols.map((m) => _thCell('${m}T')),
             ],
           ),
@@ -729,19 +821,19 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
         border: Border.all(color: _C.blue.withValues(alpha: 0.3)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Vay ${_fmtMoney(amount)} � ${s.months} th�ng',
+        Text('Vay ${_fmtMoney(amount)} · ${s.months} tháng',
             style: const TextStyle(fontSize: 12, color: _C.secondary)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _statBox('L�i su?t/nam', '${ratePercent.toStringAsFixed(2)}%', _C.blue)),
+          Expanded(child: _statBox('Lãi suất/năm', '${ratePercent.toStringAsFixed(2)}%', _C.blue)),
           const SizedBox(width: 8),
-          Expanded(child: _statBox('Tr? h�ng th�ng', _fmtFull(c.monthly), _C.blue)),
+          Expanded(child: _statBox('Trả hàng tháng', _fmtFull(c.monthly), _C.blue)),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _statBox('T?ng l�i', _fmtFull(c.totalInterest), _C.primary)),
+          Expanded(child: _statBox('Tổng lãi', _fmtFull(c.totalInterest), _C.primary)),
           const SizedBox(width: 8),
-          Expanded(child: _statBox('T?ng ph?i tr?', _fmtFull(c.total), _C.primary)),
+          Expanded(child: _statBox('Tổng phải trả', _fmtFull(c.total), _C.primary)),
         ]),
       ]),
     );
@@ -762,34 +854,34 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _infoNote('Th�ng tin l?y t? h? so KYC. Vui l�ng b? sung th�m th�ng tin gia d�nh.',
+        _infoNote('Thông tin lấy từ hồ sơ KYC. Vui lòng bổ sung thêm thông tin gia đình.',
             icon: Icons.info_outline, color: _C.blue, bg: _C.blueLight),
 
-        _sectionHeader(Icons.person_outline, 'Th�ng tin co b?n'),
-        _prefilledField('H? v� t�n',       _user['fullName']!),
+        _sectionHeader(Icons.person_outline, 'Thông tin cơ bản'),
+        _prefilledField('Họ và tên',       _user['fullName']!),
         Row(children: [
-          Expanded(child: _prefilledField('Ng�y sinh',   _user['dob']!)),
+          Expanded(child: _prefilledField('Ngày sinh',   _user['dob']!)),
           const SizedBox(width: 10),
-          Expanded(child: _prefilledField('S? CCCD',     _user['citizenId']!)),
+          Expanded(child: _prefilledField('Số CCCD',     _user['citizenId']!)),
         ]),
-        _prefilledField('D?a ch? thu?ng tr�', _user['address']!),
+        _prefilledField('Địa chỉ thường trú', _user['address']!),
         Row(children: [
-          Expanded(child: _prefilledField('S? di?n tho?i', _user['phone']!)),
+          Expanded(child: _prefilledField('Số điện thoại', _user['phone']!)),
           const SizedBox(width: 10),
           Expanded(child: _prefilledField('Email',          _user['email']!)),
         ]),
 
-        _sectionHeader(Icons.people_outline, 'Th�ng tin gia d�nh'),
-        _labelText('T�nh tr?ng h�n nh�n', required: true),
+        _sectionHeader(Icons.people_outline, 'Thông tin gia đình'),
+        _labelText('Tình trạng hôn nhân', required: true),
         _radioGroup(
-          options : ['D?c th�n', 'D� k?t h�n', 'Ly h�n', 'G�a'],
+          options : ['Độc thân', 'Đã kết hôn', 'Ly hôn', 'Góa'],
           selected: _maritalStatus,
           onChanged: (v) => setState(() => _maritalStatus = v),
         ),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _labelText('S? ngu?i ph? thu?c'),
+            _labelText('Số người phụ thuộc'),
             TextField(
               controller: _dependentsCtrl,
               keyboardType: TextInputType.number,
@@ -799,24 +891,24 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           ])),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _labelText('Tr�nh d? h?c v?n'),
+            _labelText('Trình độ học vấn'),
             _dropdownField(
               value: _education.isEmpty ? null : _education,
-              hint: 'Ch?n',
-              items: ['THPT', 'Cao d?ng', 'D?i h?c', 'Sau d?i h?c', 'Kh�c'],
+              hint: 'Chọn',
+              items: ['THPT', 'Cao đẳng', 'Đại học', 'Sau đại học', 'Khác'],
               onChanged: (v) => setState(() => _education = v ?? ''),
             ),
           ])),
         ]),
         const SizedBox(height: 12),
-        _labelText('D?a ch? thu t�n (n?u kh�c thu?ng tr�)'),
+        _labelText('Địa chỉ thư tín (nếu khác thường trú)'),
         TextField(
           controller: _mailAddrCtrl,
           style: const TextStyle(fontSize: 13),
-          decoration: _inputDeco('Nh?p d?a ch? nh?n thu t�n'),
+          decoration: _inputDeco('Nhập địa chỉ nhận thư tín'),
         ),
         const SizedBox(height: 24),
-        _nextBtn('Ti?p t?c', () => _goStep(2), accent: _C.blue),
+        _nextBtn('Tiếp tục', () => _goStep(2), accent: _C.blue),
       ]),
     );
   }
@@ -826,33 +918,33 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _sectionHeader(Icons.work_outline, 'Ngh? nghi?p & thu nh?p'),
-        _labelText('Ngh? nghi?p hi?n t?i', required: true),
+        _sectionHeader(Icons.work_outline, 'Nghề nghiệp & thu nhập'),
+        _labelText('Nghề nghiệp hiện tại', required: true),
         _dropdownField(
           value: _occupation.isEmpty ? null : _occupation,
-          hint: 'Ch?n ngh? nghi?p',
-          items: ['Nh�n vi�n van ph�ng', 'Kinh doanh t? do', 'C�ng ch?c/vi�n ch?c',
-                  'Lao d?ng ph? th�ng', 'N?i tr?', 'Huu tr�', 'Kh�c'],
+          hint: 'Chọn nghề nghiệp',
+          items: ['Nhân viên văn phòng', 'Kinh doanh tự do', 'Công chức/viên chức',
+                  'Lao động phổ thông', 'Nội trợ', 'Hưu trí', 'Khác'],
           onChanged: (v) => setState(() => _occupation = v ?? ''),
         ),
         const SizedBox(height: 12),
-        _labelText('T�n c�ng ty / don v? c�ng t�c'),
+        _labelText('Tên công ty / đơn vị công tác'),
         TextField(controller: _companyCtrl, style: const TextStyle(fontSize: 13),
-            decoration: _inputDeco('Nh?p t�n don v?')),
+            decoration: _inputDeco('Nhập tên đơn vị')),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _labelText('Th?i gian l�m vi?c'),
+            _labelText('Thời gian làm việc'),
             _dropdownField(
               value: _workDuration.isEmpty ? null : _workDuration,
-              hint: 'Ch?n',
-              items: ['< 6 th�ng', '6-12 th�ng', '1-3 nam', '3-5 nam', '> 5 nam'],
+              hint: 'Chọn',
+              items: ['< 6 tháng', '6-12 tháng', '1-3 năm', '3-5 năm', '> 5 năm'],
               onChanged: (v) => setState(() => _workDuration = v ?? ''),
             ),
           ])),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _labelText('Thu nh?p h�ng th�ng (?)', required: true),
+            _labelText('Thu nhập hàng tháng (VND)', required: true),
             TextField(
               controller: _incomeCtrl,
               keyboardType: TextInputType.number,
@@ -862,47 +954,53 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           ])),
         ]),
         const SizedBox(height: 12),
-        _labelText('Ngu?n thu nh?p kh�c (n?u c�)'),
+        _labelText('Nguồn thu nhập khác (nếu có)'),
         TextField(controller: _otherIncomeCtrl, style: const TextStyle(fontSize: 13),
-            decoration: _inputDeco('VD: cho thu� nh�, c? t?c...')),
+            decoration: _inputDeco('VD: cho thuê nhà, cổ tức...')),
 
-        _sectionHeader(Icons.home_outlined, 'T�nh tr?ng cu tr�'),
-        _labelText('Lo?i nh� ? hi?n t?i', required: true),
+        _sectionHeader(Icons.home_outlined, 'Tình trạng cư trú'),
+        _labelText('Loại nhà ở hiện tại', required: true),
         _radioGroup(
-          options: ['Nh� ri�ng', 'Nh� thu�', '? c�ng gia d�nh', 'Nh� c�ng v?'],
+          options: ['Nhà riêng', 'Nhà thuê', 'Ở cùng gia đình', 'Nhà công vụ'],
           selected: _housingStatus,
           onChanged: (v) => setState(() => _housingStatus = v),
         ),
 
-        _sectionHeader(Icons.credit_card_outlined, 'Th�ng tin kho?n vay'),
-        _labelText('M?c d�ch vay', required: true),
+        _sectionHeader(Icons.credit_card_outlined, 'Thông tin khoản vay'),
+        _labelText('Mục đích vay', required: true),
         TextField(
           controller: _purposeCtrl,
           maxLines: 3,
           style: const TextStyle(fontSize: 13),
-          decoration: _inputDeco('VD: Mua xe m�y, s?a nh�, kinh doanh nh? l?...'),
+          decoration: _inputDeco('VD: Mua xe máy, sửa nhà, kinh doanh nhỏ lẻ...'),
         ),
         const SizedBox(height: 12),
-        _labelText('Lo?i vay', required: true),
+        _labelText('Loại vay', required: true),
         _radioGroup(
-          options: ['T�n ch?p', 'Th? ch?p'],
-          selected: _loanType == 'unsecured' ? 'T�n ch?p' : 'Th? ch?p',
+          options: ['Tín chấp', 'Thế chấp'],
+          selected: _loanType == 'unsecured' ? 'Tín chấp' : 'Thế chấp',
           onChanged: (v) => setState(() {
-            _loanType = v == 'T�n ch?p' ? 'unsecured' : 'secured';
+            _loanType = v == 'Tín chấp' ? 'unsecured' : 'secured';
             _selectedLoanProductId = null;
+            _contractTemplateCode = null;
+            _contractTemplate = null;
+            _contractError = null;
+            _agreementAccepted = false;
+            _devOtpHint = null;
+            _otpCtrl.clear();
           }),
         ),
         if (_loanType == 'secured') ...[
           const SizedBox(height: 12),
-          _labelText('M� t? t�i s?n th? ch?p', required: true),
+          _labelText('Mô tả tài sản thế chấp', required: true),
           TextField(
             controller: _collDescCtrl,
             maxLines: 2,
             style: const TextStyle(fontSize: 13),
-            decoration: _inputDeco('VD: S? d? d?t 80m�, H� N?i / Xe � t� 2022'),
+            decoration: _inputDeco('VD: Sổ đỏ đất 80m², Hà Nội / Xe ô tô 2022'),
           ),
           const SizedBox(height: 10),
-          _labelText('Gi� tr? t�i s?n u?c t�nh (?)'),
+          _labelText('Giá trị tài sản ước tính (VND)'),
           TextField(
             controller: _collValCtrl,
             keyboardType: TextInputType.number,
@@ -911,7 +1009,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           ),
         ],
         const SizedBox(height: 16),
-        _labelText('T�i kho?n nh?n gi?i ng�n', required: true),
+        _labelText('Tài khoản nhận giải ngân', required: true),
         if (_loadingAccounts)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -932,7 +1030,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
               children: [
                 Text(_accountsError!, style: const TextStyle(fontSize: 12, color: _C.error)),
                 const SizedBox(height: 8),
-                TextButton(onPressed: _loadAccounts, child: const Text('T?i l?i t�i kho?n')),
+                TextButton(onPressed: _loadAccounts, child: const Text('Tải lại tài khoản')),
               ],
             ),
           )
@@ -943,7 +1041,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
             () => setState(() => _disbAccountId = account.id),
           )),
           const SizedBox(height: 12),
-          _labelText('T�i kho?n ho�n tr? h�ng th�ng', required: true),
+          _labelText('Tài khoản hoàn trả hàng tháng', required: true),
           ..._accounts.map((account) => _accountTile(
             account,
             account.id == _repayAccountId,
@@ -952,7 +1050,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
         ],
         const SizedBox(height: 24),
         _nextBtn(
-          'Ti?p t?c',
+          'Tiếp tục',
           () => _goStep(3),
           accent: _C.blue,
           disabled: _loadingAccounts || _accounts.isEmpty || _disbAccountId == null || _repayAccountId == null,
@@ -983,21 +1081,21 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _infoNote('T?i ?nh r� n�t, kh�ng b? m? ho?c che khu?t th�ng tin.',
+        _infoNote('Tải ảnh rõ nét, không bị mờ hoặc che khuất thông tin.',
             icon: Icons.info_outline, color: _C.blue, bg: _C.blueLight),
-        docSection('Gi?y t? t�y th�n',    Icons.badge_outlined,        idDocs),
-        docSection('Ch?ng minh t�i ch�nh', Icons.account_balance_wallet_outlined, incomeDocs),
+        docSection('Giấy tờ tùy thân',    Icons.badge_outlined,        idDocs),
+        docSection('Chứng minh tài chính', Icons.account_balance_wallet_outlined, incomeDocs),
         if (collDocs.isNotEmpty)
-          docSection('Gi?y t? th? ch?p',  Icons.home_outlined,         collDocs),
+          docSection('Giấy tờ thế chấp',  Icons.home_outlined,         collDocs),
         if (supportDocs.isNotEmpty)
-          docSection('T�i li?u h? tr?',   Icons.description_outlined,  supportDocs),
+          docSection('Tài liệu hỗ trợ',   Icons.description_outlined,  supportDocs),
         const SizedBox(height: 24),
-        _nextBtn('Ti?p t?c', () => _goStep(4),
+        _nextBtn('Tiếp tục', () => _goStep(4),
             accent: _C.blue, disabled: !_allRequiredDocsUploaded),
         if (!_allRequiredDocsUploaded)
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Text('* Vui l�ng t?i d? c�c t�i li?u b?t bu?c',
+            child: Text('* Vui lòng tải đủ các tài liệu bắt buộc',
                 style: TextStyle(fontSize: 11, color: _C.error)),
           ),
       ]),
@@ -1029,7 +1127,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(doc.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            Text(isDone ? 'D� t?i l�n � nh?n d? thay d?i' : doc.subtitle,
+            Text(isDone ? 'Đã tải lên · nhấn để thay đổi' : doc.subtitle,
                 style: const TextStyle(fontSize: 11, color: _C.secondary)),
           ])),
           Container(
@@ -1038,7 +1136,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
               color: doc.required ? _C.errorLight : const Color(0xFFF1F3F9),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(doc.required ? 'B?t bu?c' : 'Tu? ch?n',
+            child: Text(doc.required ? 'Bắt buộc' : 'Tùy chọn',
                 style: TextStyle(fontSize: 10, color: doc.required ? _C.error : _C.secondary)),
           ),
         ]),
@@ -1057,7 +1155,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           children: const [
             SizedBox(height: 20),
             Text(
-              'Vui l�ng ch?n k? h?n v� nh?p s? ti?n vay ? bu?c d?u ti�n.',
+              'Vui lòng chọn kỳ hạn và nhập số tiền vay ở bước đầu tiên.',
               style: TextStyle(fontSize: 14, color: _C.secondary),
             ),
           ],
@@ -1071,41 +1169,38 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _sectionHeader(Icons.check_circle_outline, 'X�c nh?n h? so vay'),
-        _confirmCard('Th�ng tin kho?n vay', [
-          ('S? ti?n vay',       _fmtFull(amount)),
-          ('K? h?n',            '${s.months} th�ng'),
-          ('S?n ph?m',          product != null ? '${product.name} (${product.code})' : 'Goi vay phu hop'),
-          ('L�i su?t',          '${ratePercent.toStringAsFixed(2)}%/nam'),
-          ('Tr? h�ng th�ng',    _fmtFull(c.monthly)),
-          ('T?ng ti?n l�i',     _fmtFull(c.totalInterest)),
-          ('T?ng ph?i tr?',     _fmtFull(c.total)),
-          ('Lo?i vay',          _loanType == 'secured' ? 'Th? ch?p' : 'T�n ch?p'),
-          ('M?c d�ch',          _purposeCtrl.text.trim().isEmpty ? '-' : _purposeCtrl.text.trim()),
+        _sectionHeader(Icons.check_circle_outline, 'Xác nhận hồ sơ vay'),
+        _confirmCard('Thông tin khoản vay', [
+          ('Số tiền vay',       _fmtFull(amount)),
+          ('Kỳ hạn',            '${s.months} tháng'),
+          ('Sản phẩm',          product != null ? '${product.name} (${product.code})' : 'Gói vay phù hợp'),
+          ('Lãi suất',          '${ratePercent.toStringAsFixed(2)}%/năm'),
+          ('Trả hàng tháng',    _fmtFull(c.monthly)),
+          ('Tổng tiền lãi',     _fmtFull(c.totalInterest)),
+          ('Tổng phải trả',     _fmtFull(c.total)),
+          ('Loại vay',          _loanType == 'secured' ? 'Thế chấp' : 'Tín chấp'),
+          ('Mục đích',          _purposeCtrl.text.trim().isEmpty ? '-' : _purposeCtrl.text.trim()),
         ]),
         const SizedBox(height: 12),
-        _confirmCard('Th�ng tin c� nh�n', [
-          ('H? v� t�n',         _user['fullName']!),
-          ('S? CCCD',           _user['citizenId']!),
-          ('T�nh tr?ng HN',     _maritalStatus.isEmpty ? '-' : _maritalStatus),
-          ('Ngh? nghi?p',       _occupation.isEmpty ? '-' : _occupation),
-          ('Thu nh?p/th�ng',    _incomeCtrl.text.trim().isEmpty ? '-' : '${_incomeCtrl.text.trim()}?'),
-          ('T�nh tr?ng cu tr�', _housingStatus.isEmpty ? '-' : _housingStatus),
+        _confirmCard('Thông tin cá nhân', [
+          ('Họ và tên',         _user['fullName']!),
+          ('Số CCCD',           _user['citizenId']!),
+          ('Tình trạng hôn nhân', _maritalStatus.isEmpty ? '-' : _maritalStatus),
+          ('Nghề nghiệp',       _occupation.isEmpty ? '-' : _occupation),
+          ('Thu nhập/tháng',    _incomeCtrl.text.trim().isEmpty ? '-' : '${_incomeCtrl.text.trim()} VND'),
+          ('Tình trạng cư trú', _housingStatus.isEmpty ? '-' : _housingStatus),
         ]),
         const SizedBox(height: 12),
-        _confirmCard('T�i kho?n', [
-          ('Nh?n gi?i ng�n', _accountById(_disbAccountId)?.accountNumber ?? '-'),
-          ('Ho�n tr?',       _accountById(_repayAccountId)?.accountNumber ?? '-'),
+        _confirmCard('Tài khoản', [
+          ('Nhận giải ngân', _accountById(_disbAccountId)?.accountNumber ?? '-'),
+          ('Hoàn trả',       _accountById(_repayAccountId)?.accountNumber ?? '-'),
         ]),
         const SizedBox(height: 12),
-        _confirmCard('T�i li?u', _docs.map((d) =>
-          (d.title, _uploadedDocs[d.id] != null ? '? D� t?i l�n' : (d.required ? '? Chua t?i' : '- B? qua'))
+        _confirmCard('Tài liệu', _docs.map((d) =>
+          (d.title, _uploadedDocs[d.id] != null ? 'Đã tải lên' : (d.required ? 'Chưa tải' : '- Bỏ qua'))
         ).toList()),
         const SizedBox(height: 12),
-        _infoNote(
-          'Sau khi admin ph� duy?t, h?p d?ng t�n d?ng v� l?ch tr? n? s? du?c g?i v? d? b?n k� x�c nh?n online tru?c khi gi?i ng�n.',
-          icon: Icons.draw_outlined, color: _C.blue, bg: _C.blueLight,
-        ),
+        _contractSignPanel(),
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
@@ -1119,7 +1214,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
             child: _submitting
                 ? const SizedBox(width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('G?i h? so dang k� vay',
+              : const Text('Gửi hồ sơ đăng ký vay',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         ),
@@ -1140,11 +1235,11 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
             child: const Icon(Icons.check_circle_outline, size: 44, color: _C.blue),
           ),
           const SizedBox(height: 20),
-          const Text('H? so d� g?i th�nh c�ng!',
+          const Text('Hồ sơ đã gửi thành công!',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _C.primary)),
           const SizedBox(height: 10),
           const Text(
-            'H? so dang du?c xem x�t trong 1-3 ng�y l�m vi?c.\nK?t qu? s? du?c th�ng b�o qua ?ng d?ng v� email.',
+            'Hồ sơ đang được xem xét trong 1-3 ngày làm việc.\nKết quả sẽ được thông báo qua ứng dụng và email.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: _C.secondary, height: 1.6),
           ),
@@ -1156,7 +1251,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('V? trang ch�nh',
+            child: const Text('Về trang chính',
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ]),
@@ -1194,7 +1289,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           child: const Row(children: [
             Icon(Icons.check, size: 10, color: _C.blue),
             SizedBox(width: 2),
-            Text('D� c�', style: TextStyle(fontSize: 10, color: _C.blue)),
+            Text('Đã có', style: TextStyle(fontSize: 10, color: _C.blue)),
           ]),
         ),
       ]),
@@ -1270,7 +1365,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
               color: isSelected ? _C.blue : _C.secondary),
           const SizedBox(width: 12),
           Expanded(child: Text(
-            '${account.accountNumber} � ${account.accountName}',
+            '${account.accountNumber} · ${account.accountName}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -1280,6 +1375,97 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           Text('ID ${account.id}', style: TextStyle(
               fontSize: 12, fontWeight: FontWeight.w700,
               color: isSelected ? _C.blue : _C.secondary)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _contractSignPanel() {
+    final tpl = _contractTemplate;
+    final body = tpl?.templateBody?.trim();
+    return Container(
+      decoration: BoxDecoration(
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _C.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.draw_outlined, size: 18, color: _C.blue),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                tpl == null ? 'Hợp đồng vay' : '${tpl.name} (${tpl.code})',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primary),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          if (_contractError != null)
+            Text(_contractError!, style: const TextStyle(fontSize: 12, color: _C.error, height: 1.4))
+          else if (tpl == null)
+            const Text('Đang tải hợp đồng...', style: TextStyle(fontSize: 12, color: _C.secondary))
+          else
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _C.bg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _C.border),
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  body == null || body.isEmpty ? (tpl.description ?? 'Hợp đồng chưa có nội dung.') : body,
+                  style: const TextStyle(fontSize: 12, color: _C.primary, height: 1.45),
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          CheckboxListTile(
+            value: _agreementAccepted,
+            onChanged: tpl == null ? null : (v) => setState(() {
+              _agreementAccepted = v ?? false;
+              if (!_agreementAccepted) {
+                _devOtpHint = null;
+                _otpCtrl.clear();
+              }
+            }),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text(
+              'Tôi đã đọc và chấp nhận hợp đồng vay',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.primary),
+            ),
+          ),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: (_sendingOtp || !_agreementAccepted || tpl == null) ? null : _sendContractOtp,
+                child: _sendingOtp
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Nhận OTP'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _otpCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                decoration: _inputDeco('OTP 6 số'),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ]),
+          if (_devOtpHint != null && _devOtpHint!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('Dev OTP: $_devOtpHint', style: const TextStyle(fontSize: 12, color: _C.secondary)),
+            ),
         ]),
       ),
     );

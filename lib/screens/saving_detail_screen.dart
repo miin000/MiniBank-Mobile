@@ -38,6 +38,10 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
   bool _loading = false;
   String? _error;
 
+  /// Whether a settlement request has already been submitted this session.
+  bool _settlementSubmitted = false;
+  bool _settlementLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +67,70 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
     }
   }
 
+  // ─── Early settlement ────────────────────────────────────────────────────
+
+  Future<void> _requestEarlySettlement() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Yêu cầu tất toán sớm',
+          style: TextStyle(fontWeight: FontWeight.w700, color: _C.textPrimary),
+        ),
+        content: const Text(
+          'Bạn có chắc muốn gửi yêu cầu tất toán sớm sổ tiết kiệm này?\n\n'
+          'Lãi suất có thể bị áp dụng theo tỷ lệ không kỳ hạn. '
+          'Yêu cầu sẽ chờ nhân viên xét duyệt trước khi thực hiện.',
+          style: TextStyle(fontSize: 14, color: _C.textSecondary),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _C.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _settlementLoading = true);
+    try {
+      await _savingApi.requestEarlySettlement(savingId: widget.savingId);
+      if (!mounted) return;
+      setState(() => _settlementSubmitted = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Yêu cầu tất toán đã được gửi. Vui lòng chờ duyệt.'),
+          backgroundColor: _C.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+          backgroundColor: _C.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _settlementLoading = false);
+    }
+  }
+
+  // ─── Formatting helpers ──────────────────────────────────────────────────
+
   String _formatCurrency(double amount) => amount.toStringAsFixed(0);
 
   String _formatCurrencyText(double? amount) {
@@ -85,16 +153,16 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
 
   String _formatTerm(String unit, int value) {
     final u = unit.toUpperCase();
-    final label = u == 'YEAR' ? 'nam' : 'thang';
+    final label = u == 'YEAR' ? 'năm' : 'tháng';
     return '$value $label';
   }
 
   String _formatRateType(String type) {
     switch (type.toUpperCase()) {
       case 'FIXED':
-        return 'Co dinh';
+        return 'Cố định';
       case 'FLOATING':
-        return 'Tha noi';
+        return 'Thả nổi';
       default:
         return type;
     }
@@ -108,6 +176,24 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
     if (lower.contains('rejected') || lower.contains('failed')) return _C.red;
     return _C.blue;
   }
+
+  String _statusLabel(String status) {
+    final lower = status.toLowerCase();
+    if (lower.contains('active') || lower.contains('open')) return 'Hoạt động';
+    if (lower.contains('pending') || lower.contains('processing') ||
+        lower.contains('submitted')) return 'Chờ duyệt';
+    if (lower.contains('closed') || lower.contains('completed')) return 'Đã đóng';
+    if (lower.contains('rejected') || lower.contains('failed')) return 'Từ chối';
+    return status;
+  }
+
+  bool get _canRequestSettlement {
+    if (_detail == null) return false;
+    final lower = _detail!.status.toLowerCase();
+    return lower.contains('active') || lower.contains('open');
+  }
+
+  // ─── Widgets ─────────────────────────────────────────────────────────────
 
   Widget _infoRow(String label, String value, {bool isLast = false}) {
     return Column(
@@ -126,7 +212,10 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
               child: Text(
                 value,
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 13, color: _C.textPrimary, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: _C.textPrimary,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -147,10 +236,62 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.textPrimary)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _C.textPrimary)),
           const SizedBox(height: 12),
           ...children,
         ],
+      ),
+    );
+  }
+
+  Widget _settlementBanner() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _C.orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _C.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.schedule_rounded, color: _C.orange, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Yêu cầu tất toán sớm đã được gửi và đang chờ nhân viên xét duyệt.',
+              style: TextStyle(fontSize: 13, color: _C.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _earlySettlementButton() {
+    if (_settlementSubmitted) return _settlementBanner();
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _settlementLoading ? null : _requestEarlySettlement,
+        icon: _settlementLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: _C.red),
+              )
+            : const Icon(Icons.exit_to_app_rounded, size: 18),
+        label: const Text('Yêu cầu tất toán sớm'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _C.red,
+          side: BorderSide(color: _C.red.withOpacity(0.5)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       ),
     );
   }
@@ -168,8 +309,11 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: _C.blue),
         ),
         title: const Text(
-          'Chi tiet so tiet kiem',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.textPrimary),
+          'Chi tiết sổ tiết kiệm',
+          style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _C.textPrimary),
         ),
       ),
       body: _loading
@@ -179,19 +323,24 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.grey),
                       const SizedBox(height: 12),
-                      Text('Loi: $_error'),
+                      Text('Lỗi: $_error'),
                       const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _loadDetail, child: const Text('Thu lai')),
+                      ElevatedButton(
+                          onPressed: _loadDetail,
+                          child: const Text('Thử lại')),
                     ],
                   ),
                 )
               : _detail == null
-                  ? const Center(child: Text('Khong co du lieu'))
+                  ? const Center(child: Text('Không có dữ liệu'))
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       children: [
+                        // ── Header card ──────────────────────────────────
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -203,53 +352,103 @@ class _SavingDetailScreenState extends State<SavingDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('So hieu: ${_detail!.code}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    'Số hiệu: ${_detail!.code}',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600),
+                                  ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: _statusColor(_detail!.status).withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(12),
+                                      color: _statusColor(_detail!.status)
+                                          .withOpacity(0.15),
+                                      borderRadius:
+                                          BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      _detail!.status,
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(_detail!.status)),
+                                      _statusLabel(_detail!.status),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: _statusColor(
+                                              _detail!.status)),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 6),
-                              Text(_detail!.productName, style: const TextStyle(fontSize: 12, color: _C.textSecondary)),
+                              Text(
+                                _detail!.productName,
+                                style: const TextStyle(
+                                    fontSize: 12, color: _C.textSecondary),
+                              ),
                               const SizedBox(height: 14),
                               Text(
                                 _formatCurrencyText(_detail!.principalAmount),
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _C.textPrimary),
+                                style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: _C.textPrimary),
                               ),
                               const SizedBox(height: 4),
-                              const Text('So tien gui', style: TextStyle(fontSize: 12, color: _C.textSecondary)),
+                              const Text(
+                                'Số tiền gửi',
+                                style: TextStyle(
+                                    fontSize: 12, color: _C.textSecondary),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _sectionCard('Thong tin chinh', [
-                          _infoRow('San pham', _detail!.productName),
-                          _infoRow('Trang thai', _detail!.status),
-                          _infoRow('So tien gui', _formatCurrencyText(_detail!.principalAmount)),
-                          _infoRow('Ngay mo', _formatDate(_detail!.openDate)),
-                          _infoRow('Ngay dao han', _formatDate(_detail!.maturityDate)),
-                          _infoRow('Ngay dong', _formatDate(_detail!.closeDate), isLast: true),
+
+                        // ── Early settlement button (active only) ────────
+                        if (_canRequestSettlement) ...[
+                          _earlySettlementButton(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Main info ────────────────────────────────────
+                        _sectionCard('Thông tin chính', [
+                          _infoRow('Sản phẩm', _detail!.productName),
+                          _infoRow('Trạng thái', _statusLabel(_detail!.status)),
+                          _infoRow('Số tiền gửi',
+                              _formatCurrencyText(_detail!.principalAmount)),
+                          _infoRow('Ngày mở', _formatDate(_detail!.openDate)),
+                          _infoRow('Ngày đáo hạn',
+                              _formatDate(_detail!.maturityDate)),
+                          _infoRow('Ngày đóng',
+                              _formatDate(_detail!.closeDate),
+                              isLast: true),
                         ]),
                         const SizedBox(height: 12),
-                        _sectionCard('Lai va ky han', [
-                          _infoRow('Lai suat thuc te', '${_detail!.actualInterestRate.toStringAsFixed(2)}%'),
-                          _infoRow('Hinh thuc lai', _formatRateType(_detail!.interestRateType)),
-                          _infoRow('Ky han', _formatTerm(_detail!.termUnit, _detail!.termValue)),
-                          _infoRow('Lai nhap goc', _detail!.capitalized ? 'Co' : 'Khong'),
-                          _infoRow('Tu dong tai tuc', _detail!.autoRenew ? 'Co' : 'Khong'),
-                          _infoRow('Lai tich luy', _formatCurrencyText(_detail!.accruedInterestAmount)),
-                          _infoRow('Lai da tra', _formatCurrencyText(_detail!.postedInterestAmount)),
-                          _infoRow('Du kien dao han', _formatCurrencyText(_detail!.projectedMaturityAmount), isLast: true),
+
+                        // ── Interest info ────────────────────────────────
+                        _sectionCard('Lãi và kỳ hạn', [
+                          _infoRow('Lãi suất thực tế',
+                              '${_detail!.actualInterestRate.toStringAsFixed(2)}%'),
+                          _infoRow('Hình thức lãi',
+                              _formatRateType(_detail!.interestRateType)),
+                          _infoRow('Kỳ hạn',
+                              _formatTerm(_detail!.termUnit, _detail!.termValue)),
+                          _infoRow('Lãi nhập gốc',
+                              _detail!.capitalized ? 'Có' : 'Không'),
+                          _infoRow('Tự động tái tục',
+                              _detail!.autoRenew ? 'Có' : 'Không'),
+                          _infoRow('Lãi tích lũy',
+                              _formatCurrencyText(
+                                  _detail!.accruedInterestAmount)),
+                          _infoRow('Lãi đã trả',
+                              _formatCurrencyText(
+                                  _detail!.postedInterestAmount)),
+                          _infoRow('Dự kiến đáo hạn',
+                              _formatCurrencyText(
+                                  _detail!.projectedMaturityAmount),
+                              isLast: true),
                         ]),
                       ],
                     ),

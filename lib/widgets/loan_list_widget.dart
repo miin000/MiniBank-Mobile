@@ -50,6 +50,15 @@ class LoanListWidget extends StatelessWidget {
     return Colors.grey;
   }
 
+  String _statusLabel(String status) {
+    final lowerStatus = status.toLowerCase();
+    if (lowerStatus.contains('active') || lowerStatus.contains('open')) return 'Hoạt động';
+    if (lowerStatus.contains('pending') || lowerStatus.contains('processing') || lowerStatus.contains('submitted')) return 'Chờ duyệt';
+    if (lowerStatus.contains('closed') || lowerStatus.contains('completed')) return 'Đã đóng';
+    if (lowerStatus.contains('rejected')) return 'Từ chối';
+    return status;
+  }
+
   Widget _loanCard(Loan loan) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -76,7 +85,7 @@ class LoanListWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(color: _getStatusColor(loan.status).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                    child: Text(loan.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(loan.status))),
+                    child: Text(_statusLabel(loan.status), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _getStatusColor(loan.status))),
                   ),
                 ],
               ),

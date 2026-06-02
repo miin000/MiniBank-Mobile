@@ -8,9 +8,9 @@ class SavingProduct {
   final String code;
   final String name;
   final String currency;
-  final String termUnit; // MONTH | YEAR
+  final String termUnit;
   final int termValue;
-  final String interestRateType; // FIXED | FLOATING
+  final String interestRateType;
   final double baseInterestRate;
   final double? penaltyInterestRate;
   final double? bonusInterestRate;
@@ -92,6 +92,12 @@ class AccountSummary {
   );
 }
 
+/// Maps to backend SavingResponse record.
+/// NOTE: backend SavingResponse does NOT include accruedInterestAmount,
+/// postedInterestAmount, projectedMaturityAmount, interestRateType,
+/// termUnit, termValue, capitalized, autoRenew fields on the list endpoint.
+/// These come from the product, not the saving record directly.
+/// We default them to safe values so the detail screen still works.
 class SavingDetail {
   final int id;
   final String code;
@@ -148,8 +154,8 @@ class SavingDetail {
         (json['accruedInterestAmount'] as num?)?.toDouble() ?? 0,
     postedInterestAmount:
         (json['postedInterestAmount'] as num?)?.toDouble() ?? 0,
-    projectedMaturityAmount: (json['projectedMaturityAmount'] as num?)
-        ?.toDouble(),
+    projectedMaturityAmount:
+        (json['projectedMaturityAmount'] as num?)?.toDouble(),
     autoRenew: json['autoRenew'] as bool? ?? false,
     status: json['status'] as String? ?? '',
     openDate: json['openDate'] as String?,
@@ -173,15 +179,16 @@ class SavingOpenInitiateResponse {
     required this.debugOtp,
   });
 
-  factory SavingOpenInitiateResponse.fromJson(Map<String, dynamic> json) => SavingOpenInitiateResponse(
-    transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
-    transactionCode: json['transactionCode']?.toString() ?? '',
-    status: json['status']?.toString() ?? '',
-    otpRequired: (json['otpRequired'] is bool)
-        ? (json['otpRequired'] as bool)
-        : (json['otpRequired']?.toString() == 'true'),
-    debugOtp: json['debugOtp'] as String?,
-  );
+  factory SavingOpenInitiateResponse.fromJson(Map<String, dynamic> json) =>
+      SavingOpenInitiateResponse(
+        transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
+        transactionCode: json['transactionCode']?.toString() ?? '',
+        status: json['status']?.toString() ?? '',
+        otpRequired: (json['otpRequired'] is bool)
+            ? (json['otpRequired'] as bool)
+            : (json['otpRequired']?.toString() == 'true'),
+        debugOtp: json['debugOtp'] as String?,
+      );
 }
 
 class SavingOpenConfirmResponse {
@@ -197,12 +204,73 @@ class SavingOpenConfirmResponse {
     required this.savingCode,
   });
 
-  factory SavingOpenConfirmResponse.fromJson(Map<String, dynamic> json) => SavingOpenConfirmResponse(
-    transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
-    status: json['status']?.toString() ?? '',
-    savingId: (json['savingId'] as num?)?.toInt() ?? 0,
-    savingCode: json['savingCode']?.toString() ?? '',
-  );
+  factory SavingOpenConfirmResponse.fromJson(Map<String, dynamic> json) =>
+      SavingOpenConfirmResponse(
+        transactionId: (json['transactionId'] as num?)?.toInt() ?? 0,
+        status: json['status']?.toString() ?? '',
+        savingId: (json['savingId'] as num?)?.toInt() ?? 0,
+        savingCode: json['savingCode']?.toString() ?? '',
+      );
+}
+
+/// Maps to backend SettlementRequestItem record:
+/// id, requestCode, savingId, savingCode, customerId, customerName,
+/// principalAmount, estimatedInterest, settlementAmount, settlementType,
+/// status, statusLabel, settlementAccountNumber, reason,
+/// submittedAt, processedAt, processNote
+class SettlementRequest {
+  final int id;
+  final String requestCode;
+  final int savingId;
+  final String savingCode;
+  final double principalAmount;
+  final double estimatedInterest;
+  final double settlementAmount;
+  final String settlementType; // 'early' | 'maturity'
+  final String status;         // 'pending' | 'approved' | 'rejected'
+  final String statusLabel;
+  final String? settlementAccountNumber;
+  final String? reason;
+  final String? submittedAt;
+  final String? processedAt;
+  final String? processNote;
+
+  const SettlementRequest({
+    required this.id,
+    required this.requestCode,
+    required this.savingId,
+    required this.savingCode,
+    required this.principalAmount,
+    required this.estimatedInterest,
+    required this.settlementAmount,
+    required this.settlementType,
+    required this.status,
+    required this.statusLabel,
+    this.settlementAccountNumber,
+    this.reason,
+    this.submittedAt,
+    this.processedAt,
+    this.processNote,
+  });
+
+  factory SettlementRequest.fromJson(Map<String, dynamic> json) =>
+      SettlementRequest(
+        id: json['id'] as int,
+        requestCode: json['requestCode'] as String? ?? '',
+        savingId: json['savingId'] as int? ?? 0,
+        savingCode: json['savingCode'] as String? ?? '',
+        principalAmount: (json['principalAmount'] as num?)?.toDouble() ?? 0,
+        estimatedInterest: (json['estimatedInterest'] as num?)?.toDouble() ?? 0,
+        settlementAmount: (json['settlementAmount'] as num?)?.toDouble() ?? 0,
+        settlementType: json['settlementType'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        statusLabel: json['statusLabel'] as String? ?? '',
+        settlementAccountNumber: json['settlementAccountNumber'] as String?,
+        reason: json['reason'] as String?,
+        submittedAt: json['submittedAt']?.toString(),
+        processedAt: json['processedAt']?.toString(),
+        processNote: json['processNote'] as String?,
+      );
 }
 
 // ─── Request bodies ───────────────────────────────────────────────────────────
@@ -213,7 +281,7 @@ class CreateSavingRequest {
   final int? settlementAccountId;
   final String principalAmount;
   final bool autoRenew;
-  final String interestPostingMode; // END_OF_TERM | MONTHLY | START_OF_TERM
+  final String interestPostingMode;
   final String? note;
 
   const CreateSavingRequest({
@@ -243,7 +311,7 @@ class SavingApi {
   final AuthedApi _api;
   const SavingApi({required AuthedApi api}) : _api = api;
 
-  /// GET /api/saving-products?status=active
+  /// GET /api/mobile/savings/products
   Future<List<SavingProduct>> getSavingProducts() async {
     final res = await _api.get('/api/mobile/savings/products');
     _checkStatus(res);
@@ -252,13 +320,15 @@ class SavingApi {
         ? List<dynamic>.from(decoded)
         : ((decoded as Map<String, dynamic>)['data'] as List<dynamic>? ??
             decoded['content'] as List<dynamic>? ??
-            (decoded['data'] is List ? List<dynamic>.from(decoded['data'] as List) : [decoded]));
+            (decoded['data'] is List
+                ? List<dynamic>.from(decoded['data'] as List)
+                : [decoded]));
     return raw
         .map((e) => SavingProduct.fromJson((e as Map).cast<String, dynamic>()))
         .toList(growable: false);
   }
 
-  /// GET /api/accounts/me  — returns accounts belonging to authenticated user
+  /// GET /api/accounts/me
   Future<List<AccountSummary>> getMyAccounts() async {
     final res = await _api.get('/api/accounts/me');
     _checkStatus(res);
@@ -269,7 +339,7 @@ class SavingApi {
         .toList();
   }
 
-  /// GET /api/savings  — savings list for authenticated user
+  /// GET /api/mobile/savings
   Future<List<SavingDetail>> getMySavings() async {
     final res = await _api.get('/api/mobile/savings');
     _checkStatus(res);
@@ -280,16 +350,19 @@ class SavingApi {
         .toList();
   }
 
-  /// GET /api/savings/{id}
+  /// GET /api/mobile/savings/{id}
   Future<SavingDetail> getSavingById(int id) async {
     final res = await _api.get('/api/mobile/savings/$id');
     _checkStatus(res);
     final decoded = jsonDecode(res.body);
-    final body = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{'data': decoded};
-    return SavingDetail.fromJson(body['data'] as Map<String, dynamic>? ?? body);
+    final body = decoded is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{'data': decoded};
+    return SavingDetail.fromJson(
+        body['data'] as Map<String, dynamic>? ?? body);
   }
 
-  /// POST /api/savings — open a new saving
+  /// POST /api/mobile/savings — create saving (old flow, no OTP)
   Future<SavingDetail> createSaving({
     required int savingProductId,
     required int sourceAccountId,
@@ -314,10 +387,11 @@ class SavingApi {
     );
     _checkStatus(res);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return SavingDetail.fromJson(body['data'] as Map<String, dynamic>? ?? body);
+    return SavingDetail.fromJson(
+        body['data'] as Map<String, dynamic>? ?? body);
   }
 
-  /// POST /api/mobile/savings/open/initiate — send OTP and create pending saving
+  /// POST /api/mobile/savings/open/initiate
   Future<SavingOpenInitiateResponse> initiateOpenSaving({
     required int savingProductId,
     required int sourceAccountId,
@@ -332,34 +406,34 @@ class SavingApi {
       body: {
         'savingProductId': savingProductId,
         'sourceAccountId': sourceAccountId,
-        if (settlementAccountId != null) 'settlementAccountId': settlementAccountId,
+        if (settlementAccountId != null)
+          'settlementAccountId': settlementAccountId,
         'autoRenew': autoRenew,
         'principalAmount': principalAmount,
         'agreementAccepted': agreementAccepted,
         if (agreementVersion != null) 'agreementVersion': agreementVersion,
       },
-      parser: (decoded) => SavingOpenInitiateResponse.fromJson((decoded as Map).cast<String, dynamic>()),
+      parser: (decoded) => SavingOpenInitiateResponse.fromJson(
+          (decoded as Map).cast<String, dynamic>()),
     );
     return res;
   }
 
-  /// POST /api/mobile/savings/open/confirm — confirm OTP and activate saving
+  /// POST /api/mobile/savings/open/confirm
   Future<SavingOpenConfirmResponse> confirmOpenSaving({
     required int transactionId,
     required String otpCode,
   }) async {
     final res = await _api.postJson(
       '/api/mobile/savings/open/confirm',
-      body: {
-        'transactionId': transactionId,
-        'otpCode': otpCode,
-      },
-      parser: (decoded) => SavingOpenConfirmResponse.fromJson((decoded as Map).cast<String, dynamic>()),
+      body: {'transactionId': transactionId, 'otpCode': otpCode},
+      parser: (decoded) => SavingOpenConfirmResponse.fromJson(
+          (decoded as Map).cast<String, dynamic>()),
     );
     return res;
   }
 
-  /// PATCH /api/savings/{id}/auto-renew
+  /// PATCH /api/mobile/savings/{id}/auto-renew
   Future<void> setAutoRenew(int id, {required bool autoRenew}) async {
     final res = await _api.patch(
       '/api/mobile/savings/$id/auto-renew',
@@ -368,13 +442,51 @@ class SavingApi {
     _checkStatus(res);
   }
 
-  /// POST /api/savings/{id}/close  — early closure / settlement
-  Future<void> closeSaving(int id) async {
-    final res = await _api.post('/api/mobile/savings/$id/close', body: '{}');
+  // ─── Settlement (tất toán sớm) ───────────────────────────────────────────
+
+  /// GET /api/mobile/savings/settlement-requests
+  /// Lists settlement requests submitted by the current user.
+  Future<List<SettlementRequest>> getMySettlementRequests() async {
+    final res = await _api.get('/api/mobile/savings/settlement-requests');
     _checkStatus(res);
+    final decoded = jsonDecode(res.body);
+    final list = _extractList(decoded);
+    return list
+        .map((e) => SettlementRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /api/mobile/savings/settlement-requests
+  /// Submits an early settlement (tất toán sớm) request for [savingId].
+  /// [settlementAccountId] is optional — backend falls back to the saving's
+  /// source account when omitted.
+  /// [reason] is optional free-text.
+  Future<SettlementRequest> requestEarlySettlement({
+    required int savingId,
+    int? settlementAccountId,
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{'savingId': savingId};
+    if (settlementAccountId != null) {
+      body['settlementAccountId'] = settlementAccountId;
+    }
+    if (reason != null && reason.isNotEmpty) {
+      body['reason'] = reason;
+    }
+    final res = await _api.post(
+      '/api/mobile/savings/settlement-requests',
+      body: jsonEncode(body),
+    );
+    _checkStatus(res);
+    final decoded = jsonDecode(res.body);
+    final map = decoded is Map<String, dynamic>
+        ? (decoded['data'] as Map<String, dynamic>? ?? decoded)
+        : decoded as Map<String, dynamic>;
+    return SettlementRequest.fromJson(map);
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────
+
   List<dynamic> _extractList(Object? decoded) {
     if (decoded is List) return decoded;
     if (decoded is Map<String, dynamic>) {
@@ -397,7 +509,8 @@ class SavingApi {
   }
 }
 
-// ----------------- Backwards-compatible simple Saving model -----------------
+// ─── Backwards-compatible simple Saving model ────────────────────────────────
+
 class Saving {
   final int id;
   final String code;

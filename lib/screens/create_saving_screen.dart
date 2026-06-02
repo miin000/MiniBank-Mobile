@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/account_api.dart';
 import '../api/authed_api.dart';
+import '../api/contract_api.dart';
 import '../api/profile_api.dart';
 import '../api/saving_api.dart';
 import '../auth/auth_storage.dart';
@@ -95,6 +97,7 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
   late AccountApi _accountApi;
   late ProfileApi _profileApi;
   late SavingApi _savingApi;
+  late ContractApi _contractApi;
   final _picker = ImagePicker();
 
   // Step 0 = matrix; steps 1-4 = form pages
@@ -143,6 +146,10 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
   String? _openedSavingCode;
   final _otpCtrl = TextEditingController();
 
+  ContractTemplateSummary? _agreementTemplate;
+  bool _loadingAgreement = false;
+  String? _agreementError;
+
   final _pageCtrl = PageController();
 
   @override
@@ -151,9 +158,11 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
     _accountApi = AccountApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _profileApi = ProfileApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _savingApi = SavingApi(api: AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage));
+    _contractApi = ContractApi(api: AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage));
     _loadProfile();
     _loadAccounts();
     _loadProducts();
+    _loadAgreementTemplate();
   }
 
   @override
@@ -175,6 +184,147 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
 
   String _fmtFull(double v) =>
       '${v.round().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')} VND';
+
+  Future<void> _loadAgreementTemplate() async {
+    setState(() {
+      _loadingAgreement = true;
+      _agreementError = null;
+    });
+    try {
+      final tpl = await _contractApi.getActiveTemplateByCode('SAVING_AGREEMENT');
+      if (!mounted) return;
+      setState(() => _agreementTemplate = tpl);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _agreementTemplate = const ContractTemplateSummary(
+          id: 0,
+          name: 'Thỏa thuận mở sổ tiết kiệm',
+          code: 'SAVING_AGREEMENT',
+          services: 'saving',
+          status: 'fallback',
+          templateBody: 'Tôi xác nhận đã đọc, hiểu và chấp nhận các điều khoản mở sổ tiết kiệm, bao gồm số tiền gửi, kỳ hạn, lãi suất, phương thức lĩnh lãi, tài khoản trích tiền và tài khoản tất toán như thông tin đã hiển thị trên màn hình xác nhận.',
+        );
+        _agreementError = null;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingAgreement = false);
+    }
+  }
+
+  String? _agreementVersion() {
+    final tpl = _agreementTemplate;
+    if (tpl == null) return null;
+    return tpl.updatedAt ?? tpl.createdAt ?? tpl.code;
+  }
+
+  String _renderTemplate(String? body, Map<String, String> data) {
+    var result = body?.trim() ?? '';
+    data.forEach((key, value) {
+      result = result.replaceAll('{{$key}}', value);
+    });
+    return result.replaceAll(RegExp(r'\{\{[^}]+\}\}'), '...');
+  }
+
+  String _agreementPreviewBody() {
+    final sel = _sel;
+    final amount = _enteredAmount() ?? sel?.amount ?? 0;
+    final product = sel == null ? null : _selectedSavingProduct(sel, amount);
+    final rate = product == null ? sel?.rate ?? 0 : _toPercentRate(product.baseInterestRate);
+    final calc = sel == null ? null : _calcSaving(sel, amount, rate);
+    final today = DateTime.now();
+    final todayText = '${today.day.toString().padLeft(2, '0')}/${today.month.toString().padLeft(2, '0')}/${today.year}';
+    final data = {
+      'customer_name': _user['fullName'] ?? '',
+      'customer_dob': _user['dob'] ?? '',
+      'customer_citizen_id': _user['citizenId'] ?? '',
+      'customer_phone': _user['phone'] ?? '',
+      'customer_address': _user['address'] ?? '',
+      'saving_product': product?.name ?? 'Goi tiet kiem',
+      'saving_amount': amount > 0 ? _fmtFull(amount) : '',
+      'saving_term_months': sel == null ? '' : '${sel.months}',
+      'saving_interest_rate': '${rate.toStringAsFixed(2)}%/nam',
+      'saving_open_date': todayText,
+      'saving_maturity_date': calc?.maturity ?? '',
+      'saving_maturity_amount': calc == null ? '' : _fmtFull(calc.total),
+      'saving_auto_renew': _autoRenew ? 'Co' : 'Khong',
+      'today': todayText,
+      'sign_date': todayText,
+      'contract_date': todayText,
+    };
+    return _renderTemplate(_agreementTemplate?.templateBody, data);
+  }
+
+  Future<void> _openAgreementLink() async {
+    final url = _agreementTemplate?.templateFileUrl ?? '';
+    if (url.isEmpty) {
+      _showAgreementPreview();
+      return;
+    }
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong the mo link thoa thuan'), backgroundColor: _C.error),
+      );
+    }
+  }
+
+  void _showAgreementPreview() {
+    final tpl = _agreementTemplate;
+    final body = _agreementPreviewBody();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _C.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.description_outlined, size: 18, color: _C.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    tpl?.name ?? 'Thỏa thuận mở sổ tiết kiệm',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _C.primary),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.58),
+                child: SingleChildScrollView(
+                  child: Text(
+                    body == null || body.isEmpty
+                        ? 'Chưa có nội dung thỏa thuận.'
+                        : body,
+                    style: const TextStyle(fontSize: 13, color: _C.primary, height: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: FilledButton.styleFrom(backgroundColor: _C.green),
+                  child: const Text('Đóng'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadProfile() async {
     try {
@@ -447,7 +597,7 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
         principalAmount: amount.toStringAsFixed(0),
         autoRenew: _autoRenew,
         agreementAccepted: true,
-        agreementVersion: 'saving_agreement_v1',
+        agreementVersion: _agreementVersion(),
       );
 
       if (!mounted) return;
@@ -1153,6 +1303,52 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
             color: _C.blue,
             bgColor: _C.blueLight,
           ),
+          if (_loadingAgreement)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Dang tai thoa thuan...',
+                style: TextStyle(fontSize: 12, color: _C.secondary),
+              ),
+            ),
+          if (_agreementError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _agreementError!,
+                style: const TextStyle(fontSize: 12, color: _C.error),
+              ),
+            ),
+          if (_agreementTemplate?.templateBody?.trim().isNotEmpty == true)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              constraints: const BoxConstraints(maxHeight: 150),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _C.border),
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  _agreementPreviewBody(),
+                  style: const TextStyle(fontSize: 12, color: _C.primary, height: 1.45),
+                ),
+              ),
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _agreementTemplate == null ? null : _openAgreementLink,
+              icon: const Icon(Icons.open_in_new, size: 16, color: _C.blue),
+              label: const Text(
+                'Xem mẫu thỏa thuận',
+                style: TextStyle(fontSize: 12, color: _C.blue, fontWeight: FontWeight.w600),
+              ),
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            ),
+          ),
           const SizedBox(height: 10),
           Container(
             decoration: BoxDecoration(
@@ -1175,9 +1371,12 @@ class _CreateSavingScreenState extends State<CreateSavingScreen> {
                 'Toi da doc va chap nhan thoa thuan mo so tiet kiem',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.primary),
               ),
-              subtitle: const Text(
-                'Tich chon de tiep tuc nhan OTP va hoan tat giao dich mo so.',
-                style: TextStyle(fontSize: 12, color: _C.secondary, height: 1.35),
+              subtitle: GestureDetector(
+                onTap: _agreementTemplate == null ? null : _showAgreementPreview,
+                child: const Text(
+                  'Nhấn vào đây để xem mẫu thỏa thuận, tích chọn để tiếp tục nhận OTP.',
+                  style: TextStyle(fontSize: 12, color: _C.secondary, height: 1.35),
+                ),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             ),

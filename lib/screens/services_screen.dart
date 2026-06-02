@@ -12,8 +12,10 @@ import 'create_loan_screen.dart';
 import 'create_saving_screen.dart';
 import 'create_service_request_screen.dart';
 import 'expense_management_screen.dart';
+import 'chatbot_screen.dart';
 import 'limit_change_request_screen.dart';
 import 'profile_change_request_screen.dart';
+import '../utils/url_utils.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _C {
@@ -166,12 +168,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   String _statusLabel(String s) {
-    final map = {
-      'active': 'Hoạt động', 'open': 'Đang mở', 'pending': 'Chờ duyệt',
-      'submitted': 'Đã gửi', 'processing': 'Đang xử lý',
-      'closed': 'Đã đóng', 'completed': 'Hoàn tất', 'rejected': 'Từ chối',
-    };
-    return map[s.toLowerCase()] ?? s;
+    final lower = s.toLowerCase();
+    if (lower.contains('active') || lower.contains('open')) return 'Hoạt động';
+    if (lower.contains('pending') || lower.contains('submitted') || lower.contains('processing')) return 'Chờ duyệt';
+    if (lower.contains('closed') || lower.contains('completed')) return 'Đã đóng';
+    if (lower.contains('rejected')) return 'Từ chối';
+    return s;
   }
 
   // ─── Reusable widgets ──────────────────────────────────────────────────────
@@ -226,6 +228,18 @@ class _ServicesScreenState extends State<ServicesScreen> {
     if (!mounted) return;
     _loadLoans();
     _loadSavings();
+  }
+
+  Future<void> _openChatbot() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatbotScreen(
+          baseUrl: widget.baseUrl,
+          wsUrl: toWsUrl(widget.baseUrl),
+          storage: widget.storage,
+        ),
+      ),
+    );
   }
 
   Widget _statCard({
@@ -511,6 +525,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
             ]),
             onPressed: () {},
           ),
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline, color: _C.textPrimary),
+            onPressed: _openChatbot,
+          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -561,12 +579,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
               colors: _C.purpleGrad,
               onTap: _openExpenseScreen,
             ),
+            const SizedBox(height: 10),
+            // Chatbot entry moved to app bar action
             const SizedBox(height: 20),
 
             // ── Quick actions ──────────────────────────────────────────────
             _sectionHeader('Thao tác nhanh'),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 _quickAction(
                   label: 'Mở sổ\ntiết kiệm',
@@ -619,6 +641,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   gradient: _C.orangeGrad,
                   onTap: _openExpenseScreen,
                 ),
+                // Chatbot quick action removed; chat now available from app bar
               ],
             ),
             const SizedBox(height: 24),

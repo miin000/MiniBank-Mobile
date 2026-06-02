@@ -12,10 +12,12 @@ import 'account_setup_screen.dart';
 import 'login_screen.dart';
 import 'kyc_screen.dart';
 import 'profile_screen.dart';
+import 'chatbot_screen.dart';
 import 'qr_screen.dart';
 import 'services_screen.dart';
 import 'transfer_screen.dart';
 import 'transaction_history_screen.dart';
+import '../utils/url_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   final String baseUrl;
@@ -137,6 +139,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _openServices() => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ServicesScreen(
           baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
+
+    void _openChatbot() => Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatbotScreen(
+        baseUrl: widget.baseUrl,
+        wsUrl: toWsUrl(widget.baseUrl),
+        storage: widget.storage
+
+        )));
 
   void _openHistory() {
     Navigator.of(context).push(
@@ -323,6 +333,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     icon: const Icon(Icons.notifications_none_rounded),
                     onPressed: () => _comingSoon('Thông báo'),
                     color: const Color(0xFF374151),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.smart_toy_outlined),
+                    tooltip: 'Chatbot',
+                    onPressed: _openChatbot,
+                    color: const Color(0xFF1B4FD8),
                   ),
                   GestureDetector(
                     onTap: () async {

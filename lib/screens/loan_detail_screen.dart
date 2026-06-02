@@ -118,6 +118,15 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
     return _C.blue;
   }
 
+  String _statusLabel(String status) {
+    final lower = status.toLowerCase();
+    if (lower.contains('active') || lower.contains('open')) return 'Hoạt động';
+    if (lower.contains('pending') || lower.contains('processing') || lower.contains('submitted')) return 'Chờ duyệt';
+    if (lower.contains('closed') || lower.contains('completed')) return 'Đã đóng';
+    if (lower.contains('overdue') || lower.contains('failed')) return 'Quá hạn';
+    return status;
+  }
+
   Color _scheduleStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'paid':
@@ -243,7 +252,7 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: _C.blue),
         ),
         title: const Text(
-          'Chi tiet khoan vay',
+          'Chi tiết khoản vay',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.textPrimary),
         ),
       ),
@@ -288,7 +297,7 @@ class _LoanDetailScreenState extends State<LoanDetailScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      _detail!.status,
+                                      _statusLabel(_detail!.status),
                                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(_detail!.status)),
                                     ),
                                   ),

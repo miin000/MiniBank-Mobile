@@ -54,6 +54,8 @@ dependencies:
   image: ^4.0.0
   web: ^1.0.0
 
+  stomp_dart_client: ^3.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

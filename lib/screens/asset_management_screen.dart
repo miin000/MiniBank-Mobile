@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/authed_api.dart';
+import '../api/contract_api.dart';
 import '../api/loan_api.dart';
 import '../api/saving_api.dart';
 import '../auth/auth_storage.dart';
@@ -9,6 +10,7 @@ import '../widgets/loan_list_widget.dart';
 import '../widgets/saving_list_widget.dart';
 import 'create_loan_screen.dart';
 import 'create_saving_screen.dart';
+import 'loan_contracts_screen.dart';
 import 'loan_detail_screen.dart';
 import 'saving_detail_screen.dart';
 
@@ -43,10 +45,14 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     with SingleTickerProviderStateMixin {
   late LoanApi _loanApi;
   late SavingApi _savingApi;
+  late ContractApi _contractApi;
   late TabController _tabController;
 
   List<Loan> _loans = [];
   List<Saving> _savings = [];
+
+  /// Number of pending (unsigned) loan contracts — shown as badge
+  int _pendingContractCount = 0;
 
   bool _loadingLoans = false;
   bool _loadingSavings = false;
@@ -60,6 +66,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     final api = AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage);
     _loanApi = LoanApi(api: api);
     _savingApi = SavingApi(api: api);
+    _contractApi = ContractApi(api: api);
     _loadAll();
   }
 
@@ -73,6 +80,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     await Future.wait([
       _loadLoans(),
       _loadSavings(),
+      _loadPendingContracts(),
     ]);
   }
 
@@ -83,17 +91,11 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     });
     try {
       final loans = await _loanApi.getLoans();
-      if (mounted) {
-        setState(() => _loans = loans);
-      }
+      if (mounted) setState(() => _loans = loans);
     } catch (e) {
-      if (mounted) {
-        setState(() => _loansError = e.toString());
-      }
+      if (mounted) setState(() => _loansError = e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _loadingLoans = false);
-      }
+      if (mounted) setState(() => _loadingLoans = false);
     }
   }
 
@@ -104,17 +106,21 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     });
     try {
       final savings = await _savingApi.getSavings();
-      if (mounted) {
-        setState(() => _savings = savings);
-      }
+      if (mounted) setState(() => _savings = savings);
     } catch (e) {
-      if (mounted) {
-        setState(() => _savingsError = e.toString());
-      }
+      if (mounted) setState(() => _savingsError = e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _loadingSavings = false);
-      }
+      if (mounted) setState(() => _loadingSavings = false);
+    }
+  }
+
+  Future<void> _loadPendingContracts() async {
+    try {
+      final contracts = await _contractApi.getMobileContracts();
+      final count = contracts.where((c) => c.isForLoan && !c.isSigned).length;
+      if (mounted) setState(() => _pendingContractCount = count);
+    } catch (_) {
+      // non-critical — badge just won't show
     }
   }
 
@@ -134,9 +140,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
         ),
       ),
     );
-    if (created == true) {
-      _loadSavings();
-    }
+    if (created == true) _loadSavings();
   }
 
   Future<void> _openCreateLoan() async {
@@ -149,9 +153,20 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
         ),
       ),
     );
-    if (created == true) {
-      _loadLoans();
-    }
+    if (created == true) _loadLoans();
+  }
+
+  Future<void> _openLoanContracts() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LoanContractsScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+    // Reload after returning — user may have signed a contract
+    _loadAll();
   }
 
   Future<void> _openSavingDetail(Saving saving) async {
@@ -231,6 +246,38 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
     );
   }
 
+  /// Orange banner shown when user has approved loan applications
+  /// with unsigned contracts waiting
+  Widget _pendingContractBanner() {
+    if (_pendingContractCount == 0) return const SizedBox.shrink();
+    return GestureDetector(
+      onTap: _openLoanContracts,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _C.orange.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _C.orange.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.assignment_outlined,
+                size: 18, color: _C.orange),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Bạn có $_pendingContractCount hợp đồng vay chờ ký — nhấn để xem và ký nhận giải ngân.',
+                style: const TextStyle(fontSize: 13, color: _C.orange),
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: _C.orange),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,16 +288,53 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: _C.blue),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 18, color: _C.blue),
         ),
         title: const Text(
-          'Quan ly Tai san',
+          'Quản lý Tài sản',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: _C.textPrimary,
           ),
         ),
+        actions: [
+          // Contracts shortcut with badge
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              IconButton(
+                onPressed: _openLoanContracts,
+                tooltip: 'Đơn vay & Hợp đồng',
+                icon: const Icon(Icons.description_outlined,
+                    color: _C.blue),
+              ),
+              if (_pendingContractCount > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: const BoxDecoration(
+                      color: _C.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$_pendingContractCount',
+                        style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadAll,
@@ -259,15 +343,20 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             const Text(
-              'So tiet kiem va khoan vay cua ban',
+              'Sổ tiết kiệm và khoản vay của bạn',
               style: TextStyle(fontSize: 13, color: _C.textSecondary),
             ),
             const SizedBox(height: 14),
+
+            // Pending contract banner
+            _pendingContractBanner(),
+
+            // Summary cards
             Row(
               children: [
                 _summaryCard(
-                  title: 'Tiet kiem',
-                  subtitle: 'so dang co',
+                  title: 'Tiết kiệm',
+                  subtitle: 'sổ đang có',
                   value: '${_activeSavingsCount()}',
                   borderColor: _C.green,
                   valueColor: _C.green,
@@ -275,8 +364,8 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                 ),
                 const SizedBox(width: 10),
                 _summaryCard(
-                  title: 'Khoan vay',
-                  subtitle: 'dang tra no',
+                  title: 'Khoản vay',
+                  subtitle: 'đang trả nợ',
                   value: '${_activeLoansCount()}',
                   borderColor: _C.orange,
                   valueColor: _C.orange,
@@ -285,16 +374,19 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
               ],
             ),
             const SizedBox(height: 16),
+
+            // Action buttons
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _openCreateSaving,
                     icon: const Icon(Icons.add_circle_outline),
-                    label: const Text('Mo so moi'),
+                    label: const Text('Mở sổ mới'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _C.green,
-                      side: BorderSide(color: _C.green.withValues(alpha: 0.35)),
+                      side:
+                          BorderSide(color: _C.green.withValues(alpha: 0.35)),
                     ),
                   ),
                 ),
@@ -303,16 +395,19 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                   child: OutlinedButton.icon(
                     onPressed: _openCreateLoan,
                     icon: const Icon(Icons.credit_card_outlined),
-                    label: const Text('Dang ky vay'),
+                    label: const Text('Đăng ký vay'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _C.blue,
-                      side: BorderSide(color: _C.blue.withValues(alpha: 0.35)),
+                      side:
+                          BorderSide(color: _C.blue.withValues(alpha: 0.35)),
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
+
+            // Tab list
             Container(
               decoration: BoxDecoration(
                 color: _C.surface,
@@ -330,8 +425,8 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                       labelColor: _C.textPrimary,
                       unselectedLabelColor: _C.textSecondary,
                       tabs: [
-                        Tab(text: 'So tiet kiem (${_savings.length})'),
-                        Tab(text: 'Khoan vay (${_loans.length})'),
+                        Tab(text: 'Sổ tiết kiệm (${_savings.length})'),
+                        Tab(text: 'Khoản vay (${_loans.length})'),
                       ],
                     ),
                   ),
@@ -359,6 +454,33 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                         );
                       },
                     ),
+                  ),
+
+                  // When loans tab is active and empty, show shortcut to contracts
+                  ListenableBuilder(
+                    listenable: _tabController,
+                    builder: (_, __) {
+                      if (_tabController.index != 1) {
+                        return const SizedBox.shrink();
+                      }
+                      if (_loadingLoans || _loans.isNotEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: OutlinedButton.icon(
+                          onPressed: _openLoanContracts,
+                          icon: const Icon(Icons.description_outlined,
+                              size: 16),
+                          label: const Text('Xem đơn vay & ký hợp đồng'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _C.blue,
+                            side: BorderSide(
+                                color: _C.blue.withValues(alpha: 0.35)),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
