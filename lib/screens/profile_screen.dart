@@ -6,7 +6,6 @@ import '../auth/auth_storage.dart';
 import '../security/device_identity.dart';
 import 'account_setup_screen.dart';
 import 'change_password_screen.dart';
-import 'edit_profile_screen.dart';
 import 'kyc_screen.dart';
 import 'pin_screen.dart';
 
@@ -56,6 +55,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _load();
   }
 
+  String _rankLabel(String? rank) {
+    return switch ((rank ?? '').toLowerCase()) {
+      'kim_cuong' => 'Kim cương',
+      'bach_kim' => 'Bạch kim',
+      'vang' => 'Vàng',
+      'bac' => 'Bạc',
+      'dong' => 'Đồng',
+      _ => 'Chưa xếp hạng',
+    };
+  }
+
+  Color _rankColor(String? rank) {
+    return switch ((rank ?? '').toLowerCase()) {
+      'kim_cuong' => const Color(0xFF2563EB),
+      'bach_kim' => const Color(0xFF64748B),
+      'vang' => const Color(0xFFB45309),
+      'bac' => const Color(0xFF71717A),
+      _ => const Color(0xFF92400E),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = _profile;
@@ -103,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.white.withOpacity(0.2),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     child: const Icon(Icons.person, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
@@ -126,12 +146,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       isActive ? 'Đã kích hoạt' : 'Chưa kích hoạt',
                       style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _rankLabel(p.customerRank),
+                      style: TextStyle(
+                        color: _rankColor(p.customerRank),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -140,25 +176,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
             _SectionCard(
               title: 'Thông tin cá nhân',
-              action: TextButton(
-                onPressed: () async {
-                  final profile = _profile;
-                  if (profile == null) return;
-                  final updated = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => EditProfileScreen(
-                        baseUrl: widget.baseUrl,
-                        storage: widget.storage,
-                        initialProfile: profile,
-                      ),
-                    ),
-                  );
-                  if (updated == true) {
-                    await _load();
-                  }
-                },
-                child: const Text('Thay doi'),
-              ),
               children: [
                 _InfoTile(label: 'Họ và tên', value: p.fullName ?? ''),
                 _InfoTile(label: 'Email', value: p.email ?? ''),
@@ -326,10 +343,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 class _SectionCard extends StatelessWidget {
   final String title;
-  final Widget? action;
   final List<Widget> children;
 
-  const _SectionCard({required this.title, required this.children, this.action});
+  const _SectionCard({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -343,10 +359,8 @@ class _SectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                if (action != null) action!,
               ],
             ),
             const SizedBox(height: 12),
