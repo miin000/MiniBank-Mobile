@@ -3,19 +3,18 @@ import 'authed_api.dart';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
-/// Mirrors the `documents` table with owner_type IN ('loan_application','saving')
-/// and document_type IN ('loan_contract','saving_certificate').
+/// Legacy contract/document model used by /api/contracts/me.
 class ContractItem {
   final int id;
-  final String ownerType; // loan_application | saving
+  final String ownerType;
   final int ownerId;
-  final String documentType; // loan_contract | saving_certificate
+  final String documentType;
   final String? fileName;
   final String? fileUrl;
   final String? mimeType;
-  final String verifiedStatus; // pending | approved | rejected
-  final String? contractNumber; // pulled from metadata_json or separate field
-  final String status; // draft | sent | pending_signature | signed | cancelled
+  final String verifiedStatus;
+  final String? contractNumber;
+  final String status;
   final String? signedAt;
   final String createdAt;
   final String? note;
@@ -40,13 +39,11 @@ class ContractItem {
     String? contractNumber = json['contractNumber'] as String?;
 
     if (contractNumber == null && json['metadataJson'] is Map) {
-      contractNumber =
-          (json['metadataJson'] as Map)['contractNumber'] as String?;
+      contractNumber = (json['metadataJson'] as Map)['contractNumber'] as String?;
     }
 
     if (contractNumber == null && json['metadata'] is Map) {
-      contractNumber =
-          (json['metadata'] as Map)['contractNumber'] as String?;
+      contractNumber = (json['metadata'] as Map)['contractNumber'] as String?;
     }
 
     return ContractItem(
@@ -60,20 +57,19 @@ class ContractItem {
       verifiedStatus: json['verifiedStatus'] as String? ?? 'pending',
       contractNumber: contractNumber,
       status: json['status'] as String? ?? 'draft',
-      signedAt: json['signedAt'] as String?,
-      createdAt: json['createdAt'] as String? ?? '',
+      signedAt: json['signedAt']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
       note: json['note'] as String?,
     );
   }
 
-  bool get isLoanContract => documentType == 'loan_contract';
-  bool get isSavingCertificate => documentType == 'saving_certificate';
-  bool get isSigned => status == 'signed';
-  bool get isPendingSignature => status == 'pending_signature';
-  bool get isSent => status == 'sent';
+  bool get isLoanContract => documentType == 'loan_contract' || ownerType == 'loan_application';
+  bool get isSavingCertificate => documentType == 'saving_certificate' || ownerType == 'saving';
+  bool get isSigned => status.toLowerCase() == 'signed';
+  bool get isPendingSignature => status.toLowerCase() == 'pending_signature';
+  bool get isSent => status.toLowerCase() == 'sent';
 }
 
-/// Payload for the online signing endpoint.
 class SignContractRequest {
   final String digitalSignature;
   final String signedAt;
@@ -124,8 +120,8 @@ class ContractTemplateSummary {
       status: json['status'] as String? ?? '',
       templateBody: json['templateBody'] as String?,
       templateFileUrl: json['templateFileUrl'] as String?,
-      createdAt: json['createdAt'] as String?,
-      updatedAt: json['updatedAt'] as String?,
+      createdAt: json['createdAt']?.toString(),
+      updatedAt: json['updatedAt']?.toString(),
     );
   }
 }
@@ -170,24 +166,28 @@ class ContractAcceptResult {
   }
 }
 
-/// Mirrors backend Contract entity returned by GET/POST /api/mobile/contracts.
+/// Mirrors backend MobileContractResponse returned by /api/mobile/contracts.
 class MobileContract {
   final int id;
   final String ownerType; // loan_application | saving
   final int ownerId;
-  final String? contractCode;
-  final String status; // PENDING | SIGNED
+  final String? contractNumber;
+  final String status; // pending_signature | signed | cancelled ...
   final String? signedAt;
   final String? createdAt;
+  final String? fileUrl;
+  final String? renderedBody;
 
   const MobileContract({
     required this.id,
     required this.ownerType,
     required this.ownerId,
-    this.contractCode,
+    this.contractNumber,
     required this.status,
     this.signedAt,
     this.createdAt,
+    this.fileUrl,
+    this.renderedBody,
   });
 
   factory MobileContract.fromJson(Map<String, dynamic> json) {
@@ -195,26 +195,33 @@ class MobileContract {
       id: json['id'] as int,
       ownerType: json['ownerType'] as String? ?? '',
       ownerId: json['ownerId'] as int? ?? 0,
-      contractCode: json['contractCode'] as String?,
+      contractNumber: json['contractNumber'] as String? ?? json['contractCode'] as String?,
       status: json['status'] as String? ?? '',
       signedAt: json['signedAt']?.toString(),
       createdAt: json['createdAt']?.toString(),
+      fileUrl: json['fileUrl'] as String?,
+      renderedBody: json['renderedBody'] as String?,
     );
   }
 
-  bool get isSigned => status.toUpperCase() == 'SIGNED';
+  bool get isSigned => status.toLowerCase() == 'signed';
+
+  bool get isPendingSignature {
+    final s = status.toLowerCase();
+    return s == 'pending_signature' || s == 'pending' || s == 'sent' || s == 'draft';
+  }
+
   bool get isForLoan => ownerType.toLowerCase() == 'loan_application';
   bool get isForSaving => ownerType.toLowerCase() == 'saving';
 }
 
-/// Mirrors backend LoanApplicationResponse.
 class LoanApplicationItem {
   final int id;
   final String? productName;
   final double requestedAmount;
   final int requestedTermMonths;
   final String? purpose;
-  final String status; // pending | approved | rejected | more_info_needed
+  final String status;
   final String? priorityTag;
   final String? submittedAt;
 
@@ -250,56 +257,46 @@ class ContractApi {
 
   const ContractApi({required AuthedApi api}) : _api = api;
 
-  /// GET /api/contracts/me
-  /// Returns all contracts loan + saving for authenticated user.
+  /// Legacy endpoint: GET /api/contracts/me
   Future<List<ContractItem>> getContracts() async {
     final res = await _api.get('/api/contracts/me');
     _check(res);
 
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-
-    return _list(body)
+    final decoded = jsonDecode(res.body);
+    return _listFromDecoded(decoded)
         .map((e) => ContractItem.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
   }
 
-  /// GET /api/contracts/{id}
+  /// Legacy endpoint: GET /api/contracts/{id}
   Future<ContractItem> getContractById(int id) async {
     final res = await _api.get('/api/contracts/$id');
     _check(res);
 
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>? ?? body;
-
-    return ContractItem.fromJson(data);
+    return ContractItem.fromJson(_mapFromDecoded(jsonDecode(res.body)));
   }
 
-  /// GET /api/contracts/me?ownerType=loan_application
   Future<List<ContractItem>> getLoanContracts() async {
     final res = await _api.get('/api/contracts/me?ownerType=loan_application');
     _check(res);
 
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-
-    return _list(body)
+    final decoded = jsonDecode(res.body);
+    return _listFromDecoded(decoded)
         .map((e) => ContractItem.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
   }
 
-  /// GET /api/contracts/me?ownerType=saving
   Future<List<ContractItem>> getSavingCertificates() async {
     final res = await _api.get('/api/contracts/me?ownerType=saving');
     _check(res);
 
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-
-    return _list(body)
+    final decoded = jsonDecode(res.body);
+    return _listFromDecoded(decoded)
         .map((e) => ContractItem.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
   }
 
-  /// POST /api/contracts/{id}/sign
-  /// Submits user's digital signature to confirm the contract.
+  /// Legacy endpoint: POST /api/contracts/{id}/sign
   Future<ContractItem> signContract(
     int id, {
     required String digitalSignature,
@@ -315,14 +312,9 @@ class ContractApi {
     );
 
     _check(res);
-
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>? ?? body;
-
-    return ContractItem.fromJson(data);
+    return ContractItem.fromJson(_mapFromDecoded(jsonDecode(res.body)));
   }
 
-  /// GET /api/mobile/contract-templates/active?code=...
   Future<ContractTemplateSummary> getActiveTemplateByCode(String code) async {
     final encoded = Uri.encodeComponent(code);
 
@@ -331,14 +323,9 @@ class ContractApi {
     );
 
     _check(res);
-
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>? ?? body;
-
-    return ContractTemplateSummary.fromJson(data);
+    return ContractTemplateSummary.fromJson(_mapFromDecoded(jsonDecode(res.body)));
   }
 
-  /// POST /api/mobile/contracts/otp/send
   Future<ContractOtpSendResponse> sendContractOtp() async {
     return _api.postJson(
       '/api/mobile/contracts/otp/send',
@@ -349,7 +336,7 @@ class ContractApi {
     );
   }
 
-  /// POST /api/mobile/contracts/accept
+  /// Legacy/self-service accept endpoint. Không dùng cho flow vay cần admin duyệt.
   Future<ContractAcceptResult> acceptContract({
     required String referenceType,
     required int referenceId,
@@ -372,70 +359,50 @@ class ContractApi {
     );
   }
 
-  // ─── Mobile contract APIs from new file ───────────────────────────────────
-
   /// GET /api/mobile/contracts
-  /// List contracts loans + savings for current user.
-  ///
-  /// Đổi tên từ getContracts() của file mới để tránh trùng với getContracts()
-  /// đang gọi /api/contracts/me ở file cũ.
   Future<List<MobileContract>> getMobileContracts() async {
     final res = await _api.get('/api/mobile/contracts');
     _check(res);
 
     final decoded = jsonDecode(res.body);
-    final list = _listFromDecoded(decoded);
-
-    return list
+    return _listFromDecoded(decoded)
         .map((e) => MobileContract.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
   }
 
-  /// POST /api/mobile/contracts/{id}/sign
-  /// Signs the contract and triggers Loan creation for loan_application contracts
-  /// or Saving activation for saving contracts.
-  ///
-  /// Đổi tên từ signContract() của file mới để tránh trùng với signContract()
-  /// cũ có truyền digitalSignature.
-  Future<MobileContract> signMobileContract(int contractId) async {
-    final res = await _api.post(
-      '/api/mobile/contracts/$contractId/sign',
-      body: '',
-    );
-
+  /// GET /api/mobile/contracts/{id}
+  Future<MobileContract> getMobileContractDetail(int id) async {
+    final res = await _api.get('/api/mobile/contracts/$id');
     _check(res);
 
-    final decoded = jsonDecode(res.body);
-    final map = _mapFromDecoded(decoded);
-
-    return MobileContract.fromJson(map);
+    return MobileContract.fromJson(_mapFromDecoded(jsonDecode(res.body)));
   }
 
-  /// GET /api/mobile/loans/applications
-  /// Loan applications for current user.
+  /// POST /api/mobile/contracts/{id}/sign
+  Future<MobileContract> signMobileContract(int id) async {
+    final res = await _api.post('/api/mobile/contracts/$id/sign');
+    _check(res);
+
+    return MobileContract.fromJson(_mapFromDecoded(jsonDecode(res.body)));
+  }
+
+  Future<MobileContract> signMobileContractWithOtp(int id, String otpCode) async {
+    final res = await _api.post(
+      '/api/mobile/contracts/$id/sign',
+      body: jsonEncode({'otpCode': otpCode}),
+    );
+    _check(res);
+    return MobileContract.fromJson(_mapFromDecoded(jsonDecode(res.body)));
+  }
+
   Future<List<LoanApplicationItem>> getMyLoanApplications() async {
     final res = await _api.get('/api/mobile/loans/applications');
     _check(res);
 
     final decoded = jsonDecode(res.body);
-    final list = _listFromDecoded(decoded);
-
-    return list
-        .map(
-          (e) => LoanApplicationItem.fromJson(
-            (e as Map).cast<String, dynamic>(),
-          ),
-        )
+    return _listFromDecoded(decoded)
+        .map((e) => LoanApplicationItem.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
-  }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  List<dynamic> _list(Map<String, dynamic> body) {
-    if (body['data'] is List) return body['data'] as List;
-    if (body['content'] is List) return body['content'] as List;
-    if (body['items'] is List) return body['items'] as List;
-    return [];
   }
 
   List<dynamic> _listFromDecoded(dynamic decoded) {
@@ -443,7 +410,9 @@ class ContractApi {
 
     if (decoded is Map) {
       final body = decoded.cast<String, dynamic>();
-      return _list(body);
+      if (body['data'] is List) return body['data'] as List;
+      if (body['content'] is List) return body['content'] as List;
+      if (body['items'] is List) return body['items'] as List;
     }
 
     return [];
@@ -452,11 +421,9 @@ class ContractApi {
   Map<String, dynamic> _mapFromDecoded(dynamic decoded) {
     if (decoded is Map) {
       final body = decoded.cast<String, dynamic>();
-
       if (body['data'] is Map) {
         return (body['data'] as Map).cast<String, dynamic>();
       }
-
       return body;
     }
 

@@ -157,9 +157,8 @@ class AccountApi {
   Future<AccountResolve> resolveAccount(String accountNumber) async {
     return _api.getJson(
       '/api/mobile/accounts/resolve',
-      query: {'accountNumber': accountNumber},
-      parser: (decoded) =>
-          AccountResolve.fromJson((decoded as Map).cast<String, dynamic>()),
+      query: {'accountNumber': accountNumber},  // ← phải đúng key này
+      parser: (decoded) => AccountResolve.fromJson((decoded as Map).cast<String, dynamic>()),
     );
   }
 

@@ -26,6 +26,23 @@ class ExpenseCategorySummary {
   }
 }
 
+
+class MonthlyTrendItem {
+  final String month;
+  final String amount;
+
+  String get label => month;
+
+  MonthlyTrendItem({required this.month, required this.amount});
+
+  factory MonthlyTrendItem.fromJson(Map<String, dynamic> json) {
+    return MonthlyTrendItem(
+      month: (json['month'] ?? json['label'] ?? json['period'])?.toString() ?? '',
+      amount: (json['amount'] ?? json['total'])?.toString() ?? '0',
+    );
+  }
+}
+
 class RecommendationItem {
   final String type;
   final String title;
@@ -140,6 +157,7 @@ class ExpenseOverview {
   final int unclassifiedTransactionCount;
   final List<ExpenseCategorySummary> categories;
   final List<UnclassifiedExpenseTransaction> unclassifiedTransactions;
+  final List<MonthlyTrendItem> monthlyTrend;
 
   ExpenseOverview({
     required this.flowType,
@@ -150,11 +168,13 @@ class ExpenseOverview {
     required this.unclassifiedTransactionCount,
     required this.categories,
     required this.unclassifiedTransactions,
+    required this.monthlyTrend,
   });
 
   factory ExpenseOverview.fromJson(Map<String, dynamic> json) {
     final categoriesRaw = json['categories'] as List<dynamic>? ?? const [];
     final unclassifiedRaw = json['unclassifiedTransactions'] as List<dynamic>? ?? const [];
+    final trendRaw = (json['monthlyTrend'] ?? json['trend']) as List<dynamic>? ?? const [];
     return ExpenseOverview(
       flowType: json['flowType']?.toString() ?? 'out',
       totalIncome: json['totalIncome']?.toString() ?? '0',
@@ -167,6 +187,9 @@ class ExpenseOverview {
           .toList(growable: false),
       unclassifiedTransactions: unclassifiedRaw
           .map((e) => UnclassifiedExpenseTransaction.fromJson((e as Map).cast<String, dynamic>()))
+          .toList(growable: false),
+      monthlyTrend: trendRaw
+          .map((e) => MonthlyTrendItem.fromJson((e as Map).cast<String, dynamic>()))
           .toList(growable: false),
     );
   }

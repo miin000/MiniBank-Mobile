@@ -406,9 +406,6 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
   }
 
   void _goStep(int step) {
-    if (step == 4) {
-      _loadContractTemplate();
-    }
     setState(() => _step = step);
     _pageCtrl.animateToPage(step,
         duration: const Duration(milliseconds: 280), curve: Curves.easeInOut);
@@ -515,48 +512,32 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
       }
       final deps = int.tryParse(_dependentsCtrl.text.trim());
       final collateralValue = double.tryParse(_collValCtrl.text.trim().replaceAll(RegExp(r'[^\d.]'), ''));
-      if (_contractTemplate == null) {
-        throw Exception(_contractError ?? 'Chưa tải được hợp đồng active');
-      }
-      if (!_agreementAccepted) {
-        throw Exception('Vui lòng đọc và chấp nhận hợp đồng vay');
-      }
-      final otp = _otpCtrl.text.trim();
-      if (otp.length != 6) throw Exception('OTP phải gồm 6 chữ số');
+      await _loanApi.applyForLoan(
+      loanProductId         : product.id,
+      disbursementAccountId : _disbAccountId!,
+      repaymentAccountId    : _repayAccountId!,
+      amount                : amount.toStringAsFixed(0),
+      termMonths            : _sel!.months,
+      purpose               : _purposeCtrl.text.trim(),
+      loanType              : _loanType,
+      monthlyIncome         : _incomeCtrl.text.trim().isNotEmpty ? _incomeCtrl.text.trim() : null,
+      collateralDescription : _loanType == 'secured' ? _collDescCtrl.text.trim() : null,
+      collateralEstimatedValue: _loanType == 'secured' ? collateralValue : null,
+      incomeProofUrl        : _uploadedDocs['payslip'],
+      collateralProofUrl    : _uploadedDocs['coll_title'],
+      bankStatementUrl      : _uploadedDocs['bank_stmt'],
+      workCertUrl           : _uploadedDocs['work_cert'],
+      maritalStatus         : _maritalStatus.isNotEmpty ? _maritalStatus : null,
+      numberOfDependents    : deps,
+      education             : _education.isNotEmpty ? _education : null,
+      occupation            : _occupation.isNotEmpty ? _occupation : null,
+      workDuration          : _workDuration.isNotEmpty ? _workDuration : null,
+      housingStatus         : _housingStatus.isNotEmpty ? _housingStatus : null,
+      mailingAddress        : _mailAddrCtrl.text.trim().isNotEmpty ? _mailAddrCtrl.text.trim() : null,
+    );
 
-      final application = await _loanApi.applyForLoan(
-        loanProductId         : product.id,
-        disbursementAccountId : _disbAccountId!,
-        repaymentAccountId    : _repayAccountId!,
-        amount                : amount.toStringAsFixed(0),
-        termMonths            : _sel!.months,
-        purpose               : _purposeCtrl.text.trim(),
-        loanType              : _loanType,
-        monthlyIncome         : _incomeCtrl.text.trim().isNotEmpty ? _incomeCtrl.text.trim() : null,
-        collateralDescription : _loanType == 'secured' ? _collDescCtrl.text.trim() : null,
-        collateralEstimatedValue: _loanType == 'secured' ? collateralValue : null,
-        incomeProofUrl        : _uploadedDocs['payslip'],
-        collateralProofUrl    : _uploadedDocs['coll_title'],
-        bankStatementUrl      : _uploadedDocs['bank_stmt'],
-        workCertUrl           : _uploadedDocs['work_cert'],
-        maritalStatus         : _maritalStatus.isNotEmpty ? _maritalStatus : null,
-        numberOfDependents    : deps,
-        education             : _education.isNotEmpty ? _education : null,
-        occupation            : _occupation.isNotEmpty ? _occupation : null,
-        workDuration          : _workDuration.isNotEmpty ? _workDuration : null,
-        housingStatus         : _housingStatus.isNotEmpty ? _housingStatus : null,
-        mailingAddress        : _mailAddrCtrl.text.trim().isNotEmpty ? _mailAddrCtrl.text.trim() : null,
-      );
-      await _contractApi.acceptContract(
-        referenceType: 'loan_application',
-        referenceId: application.id,
-        templateCode: _contractTemplate!.code.isNotEmpty
-            ? _contractTemplate!.code
-            : _loanContractTemplateCode(),
-        otpCode: otp,
-      );
-      if (!mounted) return;
-      _goStep(5);
+    if (!mounted) return;
+    _goStep(5);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -566,7 +547,7 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     }
   }
 
-  // ??? Build ???????????????????????????????????????????????????????????????
+  // Build
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -634,6 +615,23 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionHeader(Icons.category_outlined, 'Loại vay'),
+        _radioGroup(
+          options: ['Tín chấp', 'Thế chấp'],
+          selected: _loanType == 'unsecured' ? 'Tín chấp' : 'Thế chấp',
+          onChanged: (v) => setState(() {
+            _loanType = v == 'Tín chấp' ? 'unsecured' : 'secured';
+            _sel = null;
+            _selectedLoanProductId = null;
+            _contractTemplateCode = null;
+            _contractTemplate = null;
+            _contractError = null;
+            _agreementAccepted = false;
+            _devOtpHint = null;
+            _otpCtrl.clear();
+          }),
+        ),
+        const SizedBox(height: 16),
         const Text('Chọn kỳ hạn và nhập số tiền vay để xem lãi suất',
             style: TextStyle(fontSize: 13, color: _C.secondary)),
         const SizedBox(height: 12),
@@ -975,20 +973,11 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           decoration: _inputDeco('VD: Mua xe máy, sửa nhà, kinh doanh nhỏ lẻ...'),
         ),
         const SizedBox(height: 12),
-        _labelText('Loại vay', required: true),
-        _radioGroup(
-          options: ['Tín chấp', 'Thế chấp'],
-          selected: _loanType == 'unsecured' ? 'Tín chấp' : 'Thế chấp',
-          onChanged: (v) => setState(() {
-            _loanType = v == 'Tín chấp' ? 'unsecured' : 'secured';
-            _selectedLoanProductId = null;
-            _contractTemplateCode = null;
-            _contractTemplate = null;
-            _contractError = null;
-            _agreementAccepted = false;
-            _devOtpHint = null;
-            _otpCtrl.clear();
-          }),
+        _prefilledField(
+          'Loại vay',
+          _loanType == 'unsecured'
+              ? 'Tín chấp - đã chọn từ bước sản phẩm vay'
+              : 'Thế chấp - đã chọn từ bước sản phẩm vay',
         ),
         if (_loanType == 'secured') ...[
           const SizedBox(height: 12),
@@ -1200,7 +1189,12 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
           (d.title, _uploadedDocs[d.id] != null ? 'Đã tải lên' : (d.required ? 'Chưa tải' : '- Bỏ qua'))
         ).toList()),
         const SizedBox(height: 12),
-        _contractSignPanel(),
+        _infoNote(
+          'Sau khi gửi hồ sơ, nhân viên tín dụng sẽ duyệt. Khi hồ sơ được duyệt, hợp đồng sẽ hiển thị trong mục Hợp đồng để bạn xem và ký.',
+          icon: Icons.info_outline,
+          color: _C.blue,
+          bg: _C.blueLight,
+        ),
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
@@ -1235,11 +1229,8 @@ class _CreateLoanScreenState extends State<CreateLoanScreen> {
             child: const Icon(Icons.check_circle_outline, size: 44, color: _C.blue),
           ),
           const SizedBox(height: 20),
-          const Text('Hồ sơ đã gửi thành công!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _C.primary)),
-          const SizedBox(height: 10),
           const Text(
-            'Hồ sơ đang được xem xét trong 1-3 ngày làm việc.\nKết quả sẽ được thông báo qua ứng dụng và email.',
+            'Hồ sơ vay đã được gửi thành công.\nHồ sơ đang chờ nhân viên tín dụng duyệt.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: _C.secondary, height: 1.6),
           ),

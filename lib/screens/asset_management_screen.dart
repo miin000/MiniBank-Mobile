@@ -50,6 +50,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
 
   List<Loan> _loans = [];
   List<Saving> _savings = [];
+  List<LoanApplication> _loanApplications = [];
 
   /// Number of pending (unsigned) loan contracts — shown as badge
   int _pendingContractCount = 0;
@@ -79,6 +80,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
   Future<void> _loadAll() async {
     await Future.wait([
       _loadLoans(),
+      _loadLoanApplications(),
       _loadSavings(),
       _loadPendingContracts(),
     ]);
@@ -96,6 +98,15 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
       if (mounted) setState(() => _loansError = e.toString());
     } finally {
       if (mounted) setState(() => _loadingLoans = false);
+    }
+  }
+
+  Future<void> _loadLoanApplications() async {
+    try {
+      final apps = await _loanApi.getMyApplications();
+      if (mounted) setState(() => _loanApplications = apps);
+    } catch (_) {
+      // Non-critical: the loan list still renders if the application badge fails.
     }
   }
 
@@ -125,10 +136,37 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
   }
 
   int _activeSavingsCount() =>
-      _savings.where((s) => s.status.toLowerCase() == 'active').length;
+      _visibleSavings.length;
 
   int _activeLoansCount() =>
-      _loans.where((l) => l.status.toLowerCase() == 'active').length;
+      _visibleLoans.length;
+
+  bool _isVisibleSaving(Saving saving) {
+    final status = saving.status.toLowerCase();
+    return status == 'active' || status == 'open';
+  }
+
+  bool _isVisibleLoan(Loan loan) {
+    final status = loan.status.toLowerCase();
+    final outstanding = double.tryParse(loan.outstandingPrincipal) ?? 0;
+    if (outstanding <= 0) return false;
+    return status == 'active' || status == 'open' || status == 'disbursed';
+  }
+
+  List<Saving> get _visibleSavings => _savings.where(_isVisibleSaving).toList(growable: false);
+
+  List<Loan> get _visibleLoans => _loans.where(_isVisibleLoan).toList(growable: false);
+
+  int _unsyncedLoanCount() {
+    final syncedApplicationIds = _loans.map((l) => l.loanApplicationId).toSet();
+    return _loanApplications.where((app) {
+      final status = app.status.toLowerCase();
+      if (syncedApplicationIds.contains(app.id)) return false;
+      return status == 'approved' ||
+          status == 'contract_pending' ||
+          status == 'pending_signature';
+    }).length;
+  }
 
   Future<void> _openCreateSaving() async {
     final created = await Navigator.of(context).push<bool>(
@@ -262,8 +300,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
         ),
         child: Row(
           children: [
-            const Icon(Icons.assignment_outlined,
-                size: 18, color: _C.orange),
+            const Icon(Icons.assignment_outlined, size: 18, color: _C.orange),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -288,8 +325,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 18, color: _C.blue),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: _C.blue),
         ),
         title: const Text(
           'Quản lý Tài sản',
@@ -307,8 +343,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
               IconButton(
                 onPressed: _openLoanContracts,
                 tooltip: 'Đơn vay & Hợp đồng',
-                icon: const Icon(Icons.description_outlined,
-                    color: _C.blue),
+                icon: const Icon(Icons.description_outlined, color: _C.blue),
               ),
               if (_pendingContractCount > 0)
                 Positioned(
@@ -325,9 +360,10 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                       child: Text(
                         '$_pendingContractCount',
                         style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800),
+                          fontSize: 9,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
@@ -365,7 +401,9 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                 const SizedBox(width: 10),
                 _summaryCard(
                   title: 'Khoản vay',
-                  subtitle: 'đang trả nợ',
+                  subtitle: _unsyncedLoanCount() > 0
+                      ? '${_unsyncedLoanCount()} chưa đồng bộ'
+                      : '${_activeLoansCount()} đang hoạt động / ${_loans.length} tổng',
                   value: '${_activeLoansCount()}',
                   borderColor: _C.orange,
                   valueColor: _C.orange,
@@ -385,8 +423,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                     label: const Text('Mở sổ mới'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _C.green,
-                      side:
-                          BorderSide(color: _C.green.withValues(alpha: 0.35)),
+                      side: BorderSide(color: _C.green.withValues(alpha: 0.35)),
                     ),
                   ),
                 ),
@@ -398,8 +435,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                     label: const Text('Đăng ký vay'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _C.blue,
-                      side:
-                          BorderSide(color: _C.blue.withValues(alpha: 0.35)),
+                      side: BorderSide(color: _C.blue.withValues(alpha: 0.35)),
                     ),
                   ),
                 ),
@@ -425,8 +461,8 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                       labelColor: _C.textPrimary,
                       unselectedLabelColor: _C.textSecondary,
                       tabs: [
-                        Tab(text: 'Sổ tiết kiệm (${_savings.length})'),
-                        Tab(text: 'Khoản vay (${_loans.length})'),
+                        Tab(text: 'Sổ tiết kiệm (${_visibleSavings.length})'),
+                        Tab(text: 'Khoản vay (${_visibleLoans.length})'),
                       ],
                     ),
                   ),
@@ -438,7 +474,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                       builder: (_, __) {
                         if (_tabController.index == 0) {
                           return SavingListWidget(
-                            savings: _savings,
+                            savings: _visibleSavings,
                             loading: _loadingSavings,
                             error: _savingsError,
                             onRefresh: _loadSavings,
@@ -446,7 +482,7 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                           );
                         }
                         return LoanListWidget(
-                          loans: _loans,
+                          loans: _visibleLoans,
                           loading: _loadingLoans,
                           error: _loansError,
                           onRefresh: _loadLoans,
@@ -463,20 +499,23 @@ class _AssetManagementScreenState extends State<AssetManagementScreen>
                       if (_tabController.index != 1) {
                         return const SizedBox.shrink();
                       }
-                      if (_loadingLoans || _loans.isNotEmpty) {
+                      if (_loadingLoans || _visibleLoans.isNotEmpty) {
                         return const SizedBox.shrink();
                       }
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: OutlinedButton.icon(
                           onPressed: _openLoanContracts,
-                          icon: const Icon(Icons.description_outlined,
-                              size: 16),
+                          icon: const Icon(
+                            Icons.description_outlined,
+                            size: 16,
+                          ),
                           label: const Text('Xem đơn vay & ký hợp đồng'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: _C.blue,
                             side: BorderSide(
-                                color: _C.blue.withValues(alpha: 0.35)),
+                              color: _C.blue.withValues(alpha: 0.35),
+                            ),
                           ),
                         ),
                       );

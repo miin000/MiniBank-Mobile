@@ -60,10 +60,12 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        _applications = results[0] as List<LoanApplicationItem>;
+        _applications = results[0] as List<LoanApplicationItem>
+          ..sort((a, b) => (b.submittedAt ?? '').compareTo(a.submittedAt ?? ''));
         _contracts = (results[1] as List<MobileContract>)
             .where((c) => c.isForLoan)
-            .toList();
+            .toList()
+          ..sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
       });
     } catch (e) {
       if (!mounted) return;
@@ -171,13 +173,9 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await _contractApi.signMobileContract(contract.id);
+      final otp = await _contractApi.sendContractOtp();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đơn vay đã gửi thành công! Chờ duyệt.')),
-      );
-      Navigator.of(context).pop(true);
-      _load(); // refresh
+      await _showOtpSheet(contract, otp);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,6 +186,86 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showOtpSheet(MobileContract contract, ContractOtpSendResponse otp) async {
+    final otpCtrl = TextEditingController(text: otp.devMode ? otp.otp ?? '' : '');
+    String? error;
+    var signing = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 18, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Xác thực ký hợp đồng', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.textPrimary)),
+              const SizedBox(height: 12),
+              if (otp.devMode && otp.otp != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: _C.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Text('Mã OTP dev: ${otp.otp}', style: const TextStyle(fontSize: 12, color: _C.orange, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextFormField(
+                controller: otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22, letterSpacing: 10, fontWeight: FontWeight.w700),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '------',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 10),
+                Text(error!, style: const TextStyle(color: _C.red, fontSize: 13)),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: signing ? null : () async {
+                    final code = otpCtrl.text.trim();
+                    if (code.length != 6) {
+                      setSheetState(() => error = 'Nhập mã OTP 6 chữ số');
+                      return;
+                    }
+                    setSheetState(() { signing = true; error = null; });
+                    try {
+                      await _contractApi.signMobileContractWithOtp(contract.id, code);
+                      if (!mounted) return;
+                      Navigator.of(sheetContext).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ký hợp đồng thành công.')));
+                      await _load();
+                    } catch (e) {
+                      setSheetState(() {
+                        signing = false;
+                        error = e.toString().replaceFirst('Exception: ', '');
+                      });
+                    }
+                  },
+                  child: signing
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Xác nhận ký'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    otpCtrl.dispose();
   }
 
   // ─── Widgets ─────────────────────────────────────────────────────────────
@@ -205,7 +283,7 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: canSign
-              ? _C.blue.withOpacity(0.4)
+              ? _C.blue.withValues(alpha: 0.4)
               : _C.border,
           width: canSign ? 1.5 : 1,
         ),
@@ -240,7 +318,7 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _appStatusColor(app.status).withOpacity(0.12),
+                  color: _appStatusColor(app.status).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -398,10 +476,10 @@ class _LoanContractsScreenState extends State<LoanContractsScreen> {
                               padding: const EdgeInsets.all(12),
                               margin: const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
-                                color: _C.blue.withOpacity(0.06),
+                                color: _C.blue.withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: _C.blue.withOpacity(0.2)),
+                                    color: _C.blue.withValues(alpha: 0.2)),
                               ),
                               child: const Row(
                                 children: [

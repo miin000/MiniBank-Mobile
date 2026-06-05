@@ -80,7 +80,10 @@ class _TransferScreenState extends State<TransferScreen> {
   void initState() {
     super.initState();
     if (widget.prefillToAccountNumber != null) _toAccCtrl.text = widget.prefillToAccountNumber!;
-    if (widget.prefillToAccountName?.trim().isNotEmpty == true) _toAccountName = widget.prefillToAccountName!.trim();
+    if (widget.prefillToAccountName?.trim().isNotEmpty == true) {
+      _toAccountName = widget.prefillToAccountName!.trim();
+      _lastResolvedAccount = widget.prefillToAccountNumber; // ← thêm dòng này
+    }
     if (widget.prefillAmount?.trim().isNotEmpty == true) _amountCtrl.text = widget.prefillAmount!.trim();
     _loadFromAccount();
     if (!kIsWeb) _prepareTransferPrereqs();

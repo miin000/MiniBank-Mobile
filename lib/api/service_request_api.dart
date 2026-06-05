@@ -139,6 +139,7 @@ class ServiceRequestApi {
     required int accountId,
     required String requestedDailyTransferLimit,
     String? reason,
+    String? payloadJson,
   }) async {
     return await api.postJson<LimitChangeRequestResponse>(
       '/api/mobile/service-requests/limit-change',
@@ -146,6 +147,7 @@ class ServiceRequestApi {
         'accountId': accountId,
         'requestedDailyTransferLimit': requestedDailyTransferLimit,
         if (reason != null && reason.isNotEmpty) 'reason': reason,
+        if (payloadJson != null) 'payloadJson': payloadJson,
       },
       parser: (decoded) {
         if (decoded == null) throw Exception('Failed to create limit change request');
@@ -159,6 +161,7 @@ class ServiceRequestApi {
     String? dob,
     String? address,
     String? reason,
+    String? payloadJson,
   }) async {
     return await api.postJson<ServiceRequest>(
       '/api/mobile/service-requests/profile-change',
@@ -167,6 +170,7 @@ class ServiceRequestApi {
         if (dob != null && dob.isNotEmpty) 'dob': dob,
         if (address != null && address.isNotEmpty) 'address': address,
         if (reason != null && reason.isNotEmpty) 'reason': reason,
+        if (payloadJson != null) 'payloadJson': payloadJson,
       },
       parser: (decoded) {
         if (decoded == null) throw Exception('Failed to create profile change request');

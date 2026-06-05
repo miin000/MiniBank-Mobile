@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../api/account_api.dart';
+import '../api/authed_api.dart';
+import '../api/expense_api.dart';
 import '../api/profile_api.dart';
 import '../api/transaction_api.dart';
 import '../auth/auth_api.dart';
@@ -15,8 +17,11 @@ import 'profile_screen.dart';
 import 'chatbot_screen.dart';
 import 'qr_screen.dart';
 import 'services_screen.dart';
+import 'create_loan_screen.dart';
+import 'create_saving_screen.dart';
 import 'transfer_screen.dart';
 import 'transaction_history_screen.dart';
+import 'notification_screen.dart';
 import '../utils/url_utils.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -42,12 +47,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _navIndex = 0;
   AccountSummary? _summary;
   List<TransactionSummary> _recent = const [];
+  DailyRecommendation? _aiRecommendation;
   bool _loadingSummary = false;
   bool _loadingRecent = false;
   bool _loadingProfile = false;
+  bool _loadingAiRecommendation = false;
   bool _hideBalance = true;
   String? _summaryError;
   String? _recentError;
+  String? _aiRecommendationError;
   String? _profileStatus;
   int _profileAccountCount = 0;
   late AnimationController _balanceAnimCtrl;
@@ -65,9 +73,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       setState(() => _user = u);
     });
-    _loadSummary();
-    _loadRecent();
-    _loadProfile();
+    Future.wait([
+      _loadSummary(),
+      _loadRecent(),
+      _loadProfile(),
+      _loadAiRecommendation(),
+    ]);
   }
 
   @override
@@ -136,9 +147,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       builder: (_) => ProfileScreen(
           baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
 
-  void _openServices() => Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ServicesScreen(
-          baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
+  void _openServices() => Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServicesScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+          identity: widget.identity,
+        ),
+      ),
+    );
+
+  Future<void> _openLoanApplication() async {
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateLoanScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+          identity: widget.identity,
+        ),
+      ),
+    );
+
+    if (submitted == true && mounted) {
+      await _loadSummary();
+      await _loadRecent();
+      await _loadProfile();
+    }
+  }
+
+  Future<void> _openSaving() async {
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateSavingScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+          identity: widget.identity,
+        ),
+      ),
+    );
+
+    if (submitted == true && mounted) {
+      await _loadSummary();
+      await _loadRecent();
+      await _loadProfile();
+    }
+  }
 
     void _openChatbot() => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ChatbotScreen(
@@ -155,6 +208,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           baseUrl: widget.baseUrl,
           storage: widget.storage,
         ),
+      ),
+    );
+  }
+
+  void _openNotifications() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NotificationScreen(baseUrl: widget.baseUrl, storage: widget.storage),
       ),
     );
   }
@@ -224,6 +285,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
+  Future<void> _loadAiRecommendation() async {
+    setState(() {
+      _loadingAiRecommendation = true;
+      _aiRecommendationError = null;
+    });
+    try {
+      final authedApi = AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage);
+      final api = ExpenseApi(api: authedApi);
+      final recommendation = await api.getDailyRecommendation();
+      if (!mounted) return;
+      setState(() => _aiRecommendation = recommendation);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _aiRecommendationError = e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingAiRecommendation = false);
+    }
+  }
+
   String _rankLabel(String? rank) {
     if (rank == null || rank.isEmpty) return 'Chưa xếp hạng';
     return switch (rank.toLowerCase()) {
@@ -285,6 +365,142 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Color _recommendationColor(String priority) {
+    return switch (priority.toUpperCase()) {
+      'HIGH' => const Color(0xFFDC2626),
+      'MEDIUM' => const Color(0xFFD97706),
+      _ => const Color(0xFF2563EB),
+    };
+  }
+
+  String _recommendationSourceLabel(String source) {
+    return source == 'RULE_BASED_AND_GEMINI' ? 'Gemini AI' : 'Quy tắc thông minh';
+  }
+
+  Widget _buildAiAdvisorCard() {
+    final recommendation = _aiRecommendation;
+    final firstItem = recommendation?.recommendations.isNotEmpty == true
+        ? recommendation!.recommendations.first
+        : null;
+    final accent = firstItem == null
+        ? const Color(0xFF7C3AED)
+        : _recommendationColor(firstItem.priority);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: recommendation == null ? _loadAiRecommendation : _showAiRecommendationsSheet,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [accent.withOpacity(0.09), const Color(0xFFFFFFFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accent.withOpacity(0.18)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: accent.withOpacity(0.12), shape: BoxShape.circle),
+              child: _loadingAiRecommendation
+                  ? Padding(
+                      padding: const EdgeInsets.all(11),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+                    )
+                  : Icon(Icons.auto_awesome_rounded, color: accent, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Expanded(
+                    child: Text('Cố vấn chi tiêu AI',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                  ),
+                  if (recommendation != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
+                      child: Text(
+                        _recommendationSourceLabel(recommendation.source),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accent),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 4),
+                Text(
+                  _loadingAiRecommendation
+                      ? 'Đang phân tích chi tiêu của bạn...'
+                      : _aiRecommendationError != null
+                          ? 'Không tải được đề xuất. Nhấn để thử lại.'
+                          : firstItem?.message ?? 'Chưa có đề xuất chi tiêu mới.',
+                  style: TextStyle(fontSize: 12, color: accent.withOpacity(0.82), height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (recommendation != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Điểm tiết kiệm: ${recommendation.savingScore}/100 • Rủi ro: ${recommendation.riskLevel}',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontWeight: FontWeight.w600)),
+                ],
+              ]),
+            ),
+            Icon(Icons.chevron_right, color: accent, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAiRecommendationsSheet() async {
+    final recommendation = _aiRecommendation;
+    if (recommendation == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Đề xuất chi tiêu ${recommendation.month}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF111827))),
+            const SizedBox(height: 6),
+            Text('${_recommendationSourceLabel(recommendation.source)} • Điểm tiết kiệm ${recommendation.savingScore}/100',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+            const SizedBox(height: 14),
+            ...recommendation.recommendations.map((item) {
+              final color = _recommendationColor(item.priority);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withOpacity(0.16)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.tips_and_updates_rounded, color: color, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+                    const SizedBox(height: 4),
+                    Text(item.message, style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.35)),
+                  ])),
+                ]),
+              );
+            }),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final summary = _summary;
@@ -331,7 +547,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   IconButton(
                     icon: const Icon(Icons.notifications_none_rounded),
-                    onPressed: () => _comingSoon('Thông báo'),
+                    onPressed: _openNotifications,
                     color: const Color(0xFF374151),
                   ),
                   IconButton(
@@ -364,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await Future.wait([_loadSummary(), _loadRecent(), _loadProfile()]);
+                  await Future.wait([_loadSummary(), _loadRecent(), _loadProfile(), _loadAiRecommendation()]);
                 },
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 24),
@@ -606,13 +822,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             icon: Icons.savings_rounded,
                             label: 'Tiết kiệm',
                             color: const Color(0xFF7C3AED),
-                            onTap: _openServices,
+                            onTap: _openSaving,
                           ),
                           _quickAction(
                             icon: Icons.account_balance_rounded,
                             label: 'Vay vốn',
                             color: const Color(0xFFEA580C),
-                            onTap: () => _comingSoon('Vay vốn'),
+                            onTap: _openLoanApplication,
                           ),
                           _quickAction(
                             icon: Icons.bar_chart_rounded,
@@ -627,44 +843,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
 
                     // ── AI Advisor Banner ─────────────────────────────────
-                    Container(
-                      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [const Color(0xFF7C3AED).withOpacity(0.07), const Color(0xFF4F46E5).withOpacity(0.04)],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.15)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42, height: 42,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7C3AED).withOpacity(0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C3AED), size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Cố vấn tài chính AI',
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF4C1D95))),
-                                SizedBox(height: 3),
-                                Text('Phân tích chi tiêu và gợi ý tiết kiệm thông minh sắp ra mắt.',
-                                    style: TextStyle(fontSize: 12, color: Color(0xFF6D28D9), height: 1.4)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, color: Color(0xFF7C3AED), size: 18),
-                        ],
-                      ),
-                    ),
+                    _buildAiAdvisorCard(),
 
                     // ── Recent Transactions ───────────────────────────────
                     Padding(
@@ -744,9 +923,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               }
               if (index == 2) { await _openQr(); }
               if (index == 3) {
-                await Navigator.of(context).push(MaterialPageRoute(
+                if (!mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
                     builder: (_) => ServicesScreen(
-                        baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
+                      baseUrl: widget.baseUrl,
+                      storage: widget.storage,
+                      identity: widget.identity,
+                    ),
+                  ),
+                );
               }
               if (index == 4) {
                 await Navigator.of(context).push(MaterialPageRoute(

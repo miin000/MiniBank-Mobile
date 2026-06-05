@@ -4,15 +4,15 @@ import 'authed_api.dart';
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 class LoanProduct {
-  final int    id;
+  final int id;
   final String code;
   final String name;
   final String loanType;
   final String currency;
   final double minAmount;
   final double maxAmount;
-  final int    minTermMonths;
-  final int    maxTermMonths;
+  final int minTermMonths;
+  final int maxTermMonths;
   final String interestRateType;
   final double baseInterestRate;
   final double? penaltyInterestRate;
@@ -39,31 +39,32 @@ class LoanProduct {
   });
 
   factory LoanProduct.fromJson(Map<String, dynamic> json) => LoanProduct(
-    id                        : json['id'] as int,
-    code                      : json['code'] as String? ?? '',
-    name                      : json['name'] as String? ?? '',
-    loanType                  : json['loanType'] as String? ?? 'PERSONAL',
-    currency                  : json['currency'] as String? ?? 'VND',
-    minAmount                 : (json['minAmount'] as num?)?.toDouble() ?? 0,
-    maxAmount                 : (json['maxAmount'] as num?)?.toDouble() ?? 0,
-    minTermMonths             : json['minTermMonths'] as int? ?? 1,
-    maxTermMonths             : json['maxTermMonths'] as int? ?? 60,
-    interestRateType          : json['interestRateType'] as String? ?? 'FIXED',
-    baseInterestRate          : (json['baseInterestRate'] as num?)?.toDouble() ?? 0,
-    penaltyInterestRate       : (json['penaltyInterestRate'] as num?)?.toDouble(),
-    interestCalculationMethod : json['interestCalculationMethod'] as String? ?? 'REDUCING_BALANCE',
-    repaymentFrequency        : json['repaymentFrequency'] as String? ?? 'MONTHLY',
-    status                    : json['status'] as String? ?? 'active',
+    id: json['id'] as int,
+    code: json['code'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    loanType: json['loanType'] as String? ?? 'PERSONAL',
+    currency: json['currency'] as String? ?? 'VND',
+    minAmount: (json['minAmount'] as num?)?.toDouble() ?? 0,
+    maxAmount: (json['maxAmount'] as num?)?.toDouble() ?? 0,
+    minTermMonths: json['minTermMonths'] as int? ?? 1,
+    maxTermMonths: json['maxTermMonths'] as int? ?? 60,
+    interestRateType: json['interestRateType'] as String? ?? 'FIXED',
+    baseInterestRate: (json['baseInterestRate'] as num?)?.toDouble() ?? 0,
+    penaltyInterestRate: (json['penaltyInterestRate'] as num?)?.toDouble(),
+    interestCalculationMethod:
+        json['interestCalculationMethod'] as String? ?? 'REDUCING_BALANCE',
+    repaymentFrequency: json['repaymentFrequency'] as String? ?? 'MONTHLY',
+    status: json['status'] as String? ?? 'active',
   );
 }
 
 class LoanApplication {
-  final int    id;
-  final int    userId;
-  final int?   loanProductId;
+  final int id;
+  final int userId;
+  final int? loanProductId;
   final String? loanProductName;
   final double requestedAmount;
-  final int    requestedTermMonths;
+  final int requestedTermMonths;
   final String? purpose;
   final String? priorityTag;
   final String status;
@@ -82,24 +83,25 @@ class LoanApplication {
     required this.submittedAt,
   });
 
-  factory LoanApplication.fromJson(Map<String, dynamic> json) => LoanApplication(
-    id                  : json['id'] as int,
-    userId              : json['userId'] as int? ?? 0,
-    loanProductId       : json['loanProductId'] as int?,
-    loanProductName     : json['loanProductName'] as String?,
-    requestedAmount     : (json['requestedAmount'] as num?)?.toDouble() ?? 0,
-    requestedTermMonths : json['requestedTermMonths'] as int? ?? 0,
-    purpose             : json['purpose'] as String?,
-    priorityTag         : json['priorityTag'] as String?,
-    status              : json['status'] as String? ?? 'pending',
-    submittedAt         : json['submittedAt'] as String? ?? '',
-  );
+  factory LoanApplication.fromJson(Map<String, dynamic> json) =>
+      LoanApplication(
+        id: json['id'] as int,
+        userId: json['userId'] as int? ?? 0,
+        loanProductId: json['loanProductId'] as int?,
+        loanProductName: json['loanProductName'] as String?,
+        requestedAmount: (json['requestedAmount'] as num?)?.toDouble() ?? 0,
+        requestedTermMonths: json['requestedTermMonths'] as int? ?? 0,
+        purpose: json['purpose'] as String?,
+        priorityTag: json['priorityTag'] as String?,
+        status: json['status'] as String? ?? 'pending',
+        submittedAt: json['submittedAt'] as String? ?? '',
+      );
 }
 
 class LoanRepaymentScheduleItem {
-  final int    id;
-  final int    loanId;
-  final int    installmentNo;
+  final int id;
+  final int loanId;
+  final int installmentNo;
   final String dueDate;
   final double openingPrincipalBalance;
   final double principalDue;
@@ -131,48 +133,45 @@ class LoanRepaymentScheduleItem {
     this.paidAt,
   });
 
+  /// Remaining amount to pay for this installment
+  double get remainingDue => totalDue - principalPaid - interestPaid;
+
   factory LoanRepaymentScheduleItem.fromJson(Map<String, dynamic> json) =>
       LoanRepaymentScheduleItem(
-        id                     : json['id'] as int,
-        loanId                 : json['loanId'] as int? ?? 0,
-        installmentNo          : json['installmentNo'] as int? ?? 0,
-        dueDate                : json['dueDate'] as String? ?? '',
-        openingPrincipalBalance: (json['openingPrincipalBalance'] as num?)?.toDouble() ?? 0,
-        principalDue           : (json['principalDue'] as num?)?.toDouble() ?? 0,
-        interestRate           : (json['interestRate'] as num?)?.toDouble() ?? 0,
-        interestDue            : (json['interestDue'] as num?)?.toDouble() ?? 0,
-        penaltyInterestDue     : (json['penaltyInterestDue'] as num?)?.toDouble() ?? 0,
-        feeDue                 : (json['feeDue'] as num?)?.toDouble() ?? 0,
-        totalDue               : (json['totalDue'] as num?)?.toDouble() ?? 0,
-        principalPaid          : (json['principalPaid'] as num?)?.toDouble() ?? 0,
-        interestPaid           : (json['interestPaid'] as num?)?.toDouble() ?? 0,
-        status                 : json['status'] as String? ?? 'unpaid',
-        paidAt                 : json['paidAt'] as String?,
+        id: json['id'] as int,
+        loanId: json['loanId'] as int? ?? 0,
+        installmentNo: json['installmentNo'] as int? ?? 0,
+        dueDate: json['dueDate'] as String? ?? '',
+        openingPrincipalBalance:
+            (json['openingPrincipalBalance'] as num?)?.toDouble() ?? 0,
+        principalDue: (json['principalDue'] as num?)?.toDouble() ?? 0,
+        interestRate: (json['interestRate'] as num?)?.toDouble() ?? 0,
+        interestDue: (json['interestDue'] as num?)?.toDouble() ?? 0,
+        penaltyInterestDue:
+            (json['penaltyInterestDue'] as num?)?.toDouble() ?? 0,
+        feeDue: (json['feeDue'] as num?)?.toDouble() ?? 0,
+        totalDue: (json['totalDue'] as num?)?.toDouble() ?? 0,
+        principalPaid: (json['principalPaid'] as num?)?.toDouble() ?? 0,
+        interestPaid: (json['interestPaid'] as num?)?.toDouble() ?? 0,
+        status: json['status'] as String? ?? 'unpaid',
+        paidAt: json['paidAt'] as String?,
       );
 }
 
-/// Maps to backend LoanResponse record:
-/// id, code, approvedAmount, disbursedAmount, outstandingPrincipal,
-/// outstandingInterest, status, repaymentFrequency, termMonths,
-/// nextDueDate, maturityDate (= closedAt), createdAt
-///
-/// NOTE: backend does NOT return actualInterestRate, interestCalculationMethod,
-/// disbursedAt, overduePrincipal, overdueInterest, or schedule in the list
-/// endpoint. Use getLoanById for full detail (same controller, /{id}).
 class LoanDetail {
-  final int    id;
+  final int id;
   final String code;
-  final int    loanApplicationId;
-  final int    userId;
-  final int?   loanProductId;
-  final int?   disbursementAccountId;
-  final int?   repaymentAccountId;
+  final int loanApplicationId;
+  final int userId;
+  final int? loanProductId;
+  final int? disbursementAccountId;
+  final int? repaymentAccountId;
   final double approvedAmount;
   final double disbursedAmount;
   final double actualInterestRate;
   final String interestCalculationMethod;
   final String repaymentFrequency;
-  final int    termMonths;
+  final int termMonths;
   final double outstandingPrincipal;
   final double outstandingInterest;
   final double overduePrincipal;
@@ -181,7 +180,7 @@ class LoanDetail {
   final String? disbursedAt;
   final String? nextDueDate;
   final String? closedAt;
-  final String  createdAt;
+  final String createdAt;
   final List<LoanRepaymentScheduleItem> schedule;
 
   const LoanDetail({
@@ -210,49 +209,99 @@ class LoanDetail {
     this.schedule = const [],
   });
 
-  /// Parses both:
-  ///   - full LoanDetail JSON (has all fields)
-  ///   - lightweight LoanResponse JSON (list endpoint — missing some fields)
   factory LoanDetail.fromJson(Map<String, dynamic> json) => LoanDetail(
-    id                        : json['id'] as int,
-    code                      : json['code'] as String? ?? '',
-    loanApplicationId         : json['loanApplicationId'] as int? ?? 0,
-    userId                    : json['userId'] as int? ?? 0,
-    loanProductId             : json['loanProductId'] as int?,
-    disbursementAccountId     : json['disbursementAccountId'] as int?,
-    repaymentAccountId        : json['repaymentAccountId'] as int?,
-    approvedAmount            : (json['approvedAmount'] as num?)?.toDouble() ?? 0,
-    disbursedAmount           : (json['disbursedAmount'] as num?)?.toDouble() ?? 0,
-    // Not present in list response — default to 0
-    actualInterestRate        : (json['actualInterestRate'] as num?)?.toDouble() ?? 0,
-    interestCalculationMethod : json['interestCalculationMethod'] as String? ?? 'REDUCING_BALANCE',
-    repaymentFrequency        : json['repaymentFrequency'] as String? ?? 'MONTHLY',
-    termMonths                : json['termMonths'] as int? ?? 0,
-    outstandingPrincipal      : (json['outstandingPrincipal'] as num?)?.toDouble() ?? 0,
-    outstandingInterest       : (json['outstandingInterest'] as num?)?.toDouble() ?? 0,
-    overduePrincipal          : (json['overduePrincipal'] as num?)?.toDouble() ?? 0,
-    overdueInterest           : (json['overdueInterest'] as num?)?.toDouble() ?? 0,
-    status                    : json['status'] as String? ?? '',
-    disbursedAt               : json['disbursedAt'] as String?,
-    // backend list endpoint uses "maturityDate" for nextDueDate field name
-    nextDueDate               : json['nextDueDate'] as String?
-                                  ?? json['maturityDate'] as String?,
-    closedAt                  : json['closedAt'] as String?,
-    createdAt                 : json['createdAt'] as String? ?? '',
-    schedule                  : (json['schedule'] as List<dynamic>?)
-        ?.map((e) => LoanRepaymentScheduleItem.fromJson(e as Map<String, dynamic>))
-        .toList() ?? [],
+    id: json['id'] as int,
+    code: json['code'] as String? ?? '',
+    loanApplicationId: json['loanApplicationId'] as int? ?? 0,
+    userId: json['userId'] as int? ?? 0,
+    loanProductId: json['loanProductId'] as int?,
+    disbursementAccountId: json['disbursementAccountId'] as int?,
+    repaymentAccountId: json['repaymentAccountId'] as int?,
+    approvedAmount: (json['approvedAmount'] as num?)?.toDouble() ?? 0,
+    disbursedAmount: (json['disbursedAmount'] as num?)?.toDouble() ?? 0,
+    actualInterestRate: (json['actualInterestRate'] as num?)?.toDouble() ?? 0,
+    interestCalculationMethod:
+        json['interestCalculationMethod'] as String? ?? 'REDUCING_BALANCE',
+    repaymentFrequency: json['repaymentFrequency'] as String? ?? 'MONTHLY',
+    termMonths: json['termMonths'] as int? ?? 0,
+    outstandingPrincipal:
+        (json['outstandingPrincipal'] as num?)?.toDouble() ?? 0,
+    outstandingInterest: (json['outstandingInterest'] as num?)?.toDouble() ?? 0,
+    overduePrincipal: (json['overduePrincipal'] as num?)?.toDouble() ?? 0,
+    overdueInterest: (json['overdueInterest'] as num?)?.toDouble() ?? 0,
+    status: json['status'] as String? ?? '',
+    disbursedAt: json['disbursedAt'] as String?,
+    nextDueDate:
+        json['nextDueDate'] as String? ?? json['maturityDate'] as String?,
+    closedAt: json['closedAt'] as String?,
+    createdAt: json['createdAt'] as String? ?? '',
+    schedule:
+        (json['schedule'] as List<dynamic>?)
+            ?.map(
+              (e) =>
+                  LoanRepaymentScheduleItem.fromJson(e as Map<String, dynamic>),
+            )
+            .toList() ??
+        [],
+  );
+}
+
+/// Contract model — maps to MobileContractResponse on the backend.
+/// Endpoint: GET /api/mobile/contracts, GET /api/mobile/contracts/{id},
+///           POST /api/mobile/contracts/{id}/sign
+class LoanContract {
+  final int id;
+  final String ownerType; // 'loan_application' | 'saving'
+  final int ownerId;
+  final String? contractNumber;
+  final String status; // 'draft' | 'pending_signature' | 'SIGNED' | ...
+  final String? signedAt;
+  final String? createdAt;
+  final String? fileUrl;
+  final String? renderedBody;
+
+  const LoanContract({
+    required this.id,
+    required this.ownerType,
+    required this.ownerId,
+    this.contractNumber,
+    required this.status,
+    this.signedAt,
+    this.createdAt,
+    this.fileUrl,
+    this.renderedBody,
+  });
+
+  bool get isSigned => status.toUpperCase() == 'SIGNED';
+  bool get canSign {
+    final s = status.toLowerCase();
+    return s == 'pending_signature' ||
+        s == 'sent' ||
+        s == 'pending' ||
+        s == 'draft';
+  }
+
+  factory LoanContract.fromJson(Map<String, dynamic> json) => LoanContract(
+    id: json['id'] as int,
+    ownerType: json['ownerType'] as String? ?? '',
+    ownerId: json['ownerId'] as int? ?? 0,
+    contractNumber: json['contractNumber'] as String?,
+    status: json['status'] as String? ?? '',
+    signedAt: json['signedAt']?.toString(),
+    createdAt: json['createdAt']?.toString(),
+    fileUrl: json['fileUrl'] as String?,
+    renderedBody: json['renderedBody'] as String?,
   );
 }
 
 // ─── Request body ─────────────────────────────────────────────────────────────
 
 class LoanApplicationRequest {
-  final int    loanProductId;
-  final int    disbursementAccountId;
-  final int    repaymentAccountId;
+  final int loanProductId;
+  final int disbursementAccountId;
+  final int repaymentAccountId;
   final String requestedAmount;
-  final int    requestedTermMonths;
+  final int requestedTermMonths;
   final String purpose;
   final String loanType;
   final String? monthlyIncome;
@@ -263,7 +312,7 @@ class LoanApplicationRequest {
   final String? bankStatementUrl;
   final String? workCertUrl;
   final String? maritalStatus;
-  final int?    numberOfDependents;
+  final int? numberOfDependents;
   final String? education;
   final String? occupation;
   final String? workDuration;
@@ -295,28 +344,30 @@ class LoanApplicationRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'loanProductId'         : loanProductId,
-    'disbursementAccountId' : disbursementAccountId,
-    'repaymentAccountId'    : repaymentAccountId,
-    'amount'                : requestedAmount,
-    'termMonths'            : requestedTermMonths,
-    'purpose'               : purpose,
-    'loanType'              : loanType,
-    if (monthlyIncome != null)            'monthlyIncome'            : monthlyIncome,
-    if (collateralDescription != null)    'collateralDescription'    : collateralDescription,
-    if (collateralEstimatedValue != null) 'collateralEstimatedValue' : collateralEstimatedValue,
-    if (incomeProofUrl != null)           'incomeProofUrl'           : incomeProofUrl,
-    if (collateralProofUrl != null)       'collateralProofUrl'       : collateralProofUrl,
-    if (bankStatementUrl != null)         'bankStatementUrl'         : bankStatementUrl,
-    if (workCertUrl != null)              'workCertUrl'              : workCertUrl,
-    if (maritalStatus != null)            'maritalStatus'            : maritalStatus,
-    if (numberOfDependents != null)       'numberOfDependents'       : numberOfDependents,
-    if (education != null)                'education'                : education,
-    if (occupation != null)               'occupation'               : occupation,
-    if (workDuration != null)             'workDuration'             : workDuration,
-    if (housingStatus != null)            'housingStatus'            : housingStatus,
+    'loanProductId': loanProductId,
+    'disbursementAccountId': disbursementAccountId,
+    'repaymentAccountId': repaymentAccountId,
+    'amount': requestedAmount,
+    'termMonths': requestedTermMonths,
+    'purpose': purpose,
+    'loanType': loanType,
+    if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
+    if (collateralDescription != null)
+      'collateralDescription': collateralDescription,
+    if (collateralEstimatedValue != null)
+      'collateralEstimatedValue': collateralEstimatedValue,
+    if (incomeProofUrl != null) 'incomeProofUrl': incomeProofUrl,
+    if (collateralProofUrl != null) 'collateralProofUrl': collateralProofUrl,
+    if (bankStatementUrl != null) 'bankStatementUrl': bankStatementUrl,
+    if (workCertUrl != null) 'workCertUrl': workCertUrl,
+    if (maritalStatus != null) 'maritalStatus': maritalStatus,
+    if (numberOfDependents != null) 'numberOfDependents': numberOfDependents,
+    if (education != null) 'education': education,
+    if (occupation != null) 'occupation': occupation,
+    if (workDuration != null) 'workDuration': workDuration,
+    if (housingStatus != null) 'housingStatus': housingStatus,
     if (mailingAddress != null && mailingAddress!.isNotEmpty)
-                                          'mailingAddress'           : mailingAddress,
+      'mailingAddress': mailingAddress,
   };
 }
 
@@ -344,12 +395,12 @@ class LoanApi {
     final res = await _api.get('/api/mobile/loans/applications');
     _check(res);
     final decoded = jsonDecode(res.body);
-    return _list(decoded)
-        .map((e) => LoanApplication.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return _list(
+      decoded,
+    ).map((e) => LoanApplication.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// GET /api/mobile/loans — returns List<LoanResponse> (lightweight)
+  /// GET /api/mobile/loans - returns List of loan responses.
   Future<List<LoanDetail>> getMyLoans() async {
     final res = await _api.get('/api/mobile/loans');
     _check(res);
@@ -359,12 +410,11 @@ class LoanApi {
         .toList();
   }
 
-  /// GET /api/mobile/loans/{id} — returns full LoanResponse
+  /// GET /api/mobile/loans/{id} — returns full LoanDetail with schedule
   Future<LoanDetail> getLoanById(int id) async {
     final res = await _api.get('/api/mobile/loans/$id');
     _check(res);
     final body = jsonDecode(res.body);
-    // Support both raw object and wrapped {data: ...}
     final map = body is Map<String, dynamic>
         ? (body['data'] as Map<String, dynamic>? ?? body)
         : body as Map<String, dynamic>;
@@ -373,55 +423,99 @@ class LoanApi {
 
   /// POST /api/mobile/loans/applications
   Future<LoanApplication> applyForLoan({
-    required int    loanProductId,
-    required int    disbursementAccountId,
-    required int    repaymentAccountId,
+    required int loanProductId,
+    required int disbursementAccountId,
+    required int repaymentAccountId,
     required String amount,
-    required int    termMonths,
+    required int termMonths,
     required String purpose,
-    String          loanType              = 'unsecured',
-    String?         monthlyIncome,
-    String?         collateralDescription,
-    double?         collateralEstimatedValue,
-    String?         incomeProofUrl,
-    String?         collateralProofUrl,
-    String?         bankStatementUrl,
-    String?         workCertUrl,
-    String?         maritalStatus,
-    int?            numberOfDependents,
-    String?         education,
-    String?         occupation,
-    String?         workDuration,
-    String?         housingStatus,
-    String?         mailingAddress,
+    String loanType = 'unsecured',
+    String? monthlyIncome,
+    String? collateralDescription,
+    double? collateralEstimatedValue,
+    String? incomeProofUrl,
+    String? collateralProofUrl,
+    String? bankStatementUrl,
+    String? workCertUrl,
+    String? maritalStatus,
+    int? numberOfDependents,
+    String? education,
+    String? occupation,
+    String? workDuration,
+    String? housingStatus,
+    String? mailingAddress,
   }) async {
     final req = LoanApplicationRequest(
-      loanProductId            : loanProductId,
-      disbursementAccountId    : disbursementAccountId,
-      repaymentAccountId       : repaymentAccountId,
-      requestedAmount          : amount,
-      requestedTermMonths      : termMonths,
-      purpose                  : purpose,
-      loanType                 : loanType,
-      monthlyIncome            : monthlyIncome,
-      collateralDescription    : collateralDescription,
-      collateralEstimatedValue : collateralEstimatedValue,
-      incomeProofUrl           : incomeProofUrl,
-      collateralProofUrl       : collateralProofUrl,
-      bankStatementUrl         : bankStatementUrl,
-      workCertUrl              : workCertUrl,
-      maritalStatus            : maritalStatus,
-      numberOfDependents       : numberOfDependents,
-      education                : education,
-      occupation               : occupation,
-      workDuration             : workDuration,
-      housingStatus            : housingStatus,
-      mailingAddress           : mailingAddress,
+      loanProductId: loanProductId,
+      disbursementAccountId: disbursementAccountId,
+      repaymentAccountId: repaymentAccountId,
+      requestedAmount: amount,
+      requestedTermMonths: termMonths,
+      purpose: purpose,
+      loanType: loanType,
+      monthlyIncome: monthlyIncome,
+      collateralDescription: collateralDescription,
+      collateralEstimatedValue: collateralEstimatedValue,
+      incomeProofUrl: incomeProofUrl,
+      collateralProofUrl: collateralProofUrl,
+      bankStatementUrl: bankStatementUrl,
+      workCertUrl: workCertUrl,
+      maritalStatus: maritalStatus,
+      numberOfDependents: numberOfDependents,
+      education: education,
+      occupation: occupation,
+      workDuration: workDuration,
+      housingStatus: housingStatus,
+      mailingAddress: mailingAddress,
     );
-    final res = await _api.post('/api/mobile/loans/applications', body: jsonEncode(req.toJson()));
+    final res = await _api.post(
+      '/api/mobile/loans/applications',
+      body: jsonEncode(req.toJson()),
+    );
     _check(res);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return LoanApplication.fromJson(body['data'] as Map<String, dynamic>? ?? body);
+    return LoanApplication.fromJson(
+      body['data'] as Map<String, dynamic>? ?? body,
+    );
+  }
+
+  // ─── Contract APIs ───────────────────────────────────────────────────────
+
+  /// GET /api/mobile/contracts — all contracts (loan + saving) for current user
+  Future<List<LoanContract>> getMyContracts() async {
+    final res = await _api.get('/api/mobile/contracts');
+    _check(res);
+    final decoded = jsonDecode(res.body);
+    return _list(
+      decoded,
+    ).map((e) => LoanContract.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// GET /api/mobile/contracts/{id}
+  Future<LoanContract> getContractById(int id) async {
+    final res = await _api.get('/api/mobile/contracts/$id');
+    _check(res);
+    final body = jsonDecode(res.body);
+    final map = body is Map<String, dynamic>
+        ? (body['data'] as Map<String, dynamic>? ?? body)
+        : body as Map<String, dynamic>;
+    return LoanContract.fromJson(map);
+  }
+
+  /// POST /api/mobile/contracts/{id}/sign — sign a pending contract.
+  /// For loan_application contracts: creates Loan + repayment schedule + disburses.
+  /// For saving contracts: activates the saving account.
+  Future<LoanContract> signContract(int contractId) async {
+    final res = await _api.post(
+      '/api/mobile/contracts/$contractId/sign',
+      body: '',
+    );
+    _check(res);
+    final body = jsonDecode(res.body);
+    final map = body is Map<String, dynamic>
+        ? (body['data'] as Map<String, dynamic>? ?? body)
+        : body as Map<String, dynamic>;
+    return LoanContract.fromJson(map);
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────
@@ -450,21 +544,23 @@ class LoanApi {
 // ─── Backwards-compatible simple Loan model ──────────────────────────────────
 
 class Loan {
-  final int     id;
-  final String  code;
-  final String  approvedAmount;
-  final String  disbursedAmount;
-  final String  outstandingPrincipal;
-  final String  outstandingInterest;
-  final String  status;
-  final String  repaymentFrequency;
-  final int     termMonths;
+  final int id;
+  final int loanApplicationId;
+  final String code;
+  final String approvedAmount;
+  final String disbursedAmount;
+  final String outstandingPrincipal;
+  final String outstandingInterest;
+  final String status;
+  final String repaymentFrequency;
+  final int termMonths;
   final String? nextDueDate;
   final String? maturityDate;
-  final String  createdAt;
+  final String createdAt;
 
   Loan({
     required this.id,
+    required this.loanApplicationId,
     required this.code,
     required this.approvedAmount,
     required this.disbursedAmount,
@@ -479,18 +575,19 @@ class Loan {
   });
 
   factory Loan.fromDetail(LoanDetail d) => Loan(
-    id                  : d.id,
-    code                : d.code,
-    approvedAmount      : d.approvedAmount.toStringAsFixed(0),
-    disbursedAmount     : d.disbursedAmount.toStringAsFixed(0),
+    id: d.id,
+    loanApplicationId: d.loanApplicationId,
+    code: d.code,
+    approvedAmount: d.approvedAmount.toStringAsFixed(0),
+    disbursedAmount: d.disbursedAmount.toStringAsFixed(0),
     outstandingPrincipal: d.outstandingPrincipal.toStringAsFixed(0),
-    outstandingInterest : d.outstandingInterest.toStringAsFixed(0),
-    status              : d.status,
-    repaymentFrequency  : d.repaymentFrequency,
-    termMonths          : d.termMonths,
-    nextDueDate         : d.nextDueDate,
-    maturityDate        : d.closedAt,
-    createdAt           : d.createdAt,
+    outstandingInterest: d.outstandingInterest.toStringAsFixed(0),
+    status: d.status,
+    repaymentFrequency: d.repaymentFrequency,
+    termMonths: d.termMonths,
+    nextDueDate: d.nextDueDate,
+    maturityDate: d.closedAt,
+    createdAt: d.createdAt,
   );
 }
 

@@ -111,6 +111,7 @@ class SavingDetail {
   final bool capitalized;
   final double accruedInterestAmount;
   final double postedInterestAmount;
+  final double? earnedInterestAmount;
   final double? projectedMaturityAmount;
   final bool autoRenew;
   final String status;
@@ -131,6 +132,7 @@ class SavingDetail {
     required this.capitalized,
     required this.accruedInterestAmount,
     required this.postedInterestAmount,
+    this.earnedInterestAmount,
     this.projectedMaturityAmount,
     required this.autoRenew,
     required this.status,
@@ -154,8 +156,10 @@ class SavingDetail {
         (json['accruedInterestAmount'] as num?)?.toDouble() ?? 0,
     postedInterestAmount:
         (json['postedInterestAmount'] as num?)?.toDouble() ?? 0,
-    projectedMaturityAmount:
-        (json['projectedMaturityAmount'] as num?)?.toDouble(),
+    earnedInterestAmount: (json['earnedInterestAmount'] as num?)?.toDouble()
+        ?? (json['totalInterestEarned'] as num?)?.toDouble(),
+    projectedMaturityAmount: (json['projectedMaturityAmount'] as num?)
+        ?.toDouble(),
     autoRenew: json['autoRenew'] as bool? ?? false,
     status: json['status'] as String? ?? '',
     openDate: json['openDate'] as String?,
@@ -227,7 +231,7 @@ class SettlementRequest {
   final double estimatedInterest;
   final double settlementAmount;
   final String settlementType; // 'early' | 'maturity'
-  final String status;         // 'pending' | 'approved' | 'rejected'
+  final String status; // 'pending' | 'approved' | 'rejected'
   final String statusLabel;
   final String? settlementAccountNumber;
   final String? reason;
@@ -319,10 +323,10 @@ class SavingApi {
     final raw = decoded is List
         ? List<dynamic>.from(decoded)
         : ((decoded as Map<String, dynamic>)['data'] as List<dynamic>? ??
-            decoded['content'] as List<dynamic>? ??
-            (decoded['data'] is List
-                ? List<dynamic>.from(decoded['data'] as List)
-                : [decoded]));
+              decoded['content'] as List<dynamic>? ??
+              (decoded['data'] is List
+                  ? List<dynamic>.from(decoded['data'] as List)
+                  : [decoded]));
     return raw
         .map((e) => SavingProduct.fromJson((e as Map).cast<String, dynamic>()))
         .toList(growable: false);
@@ -358,8 +362,7 @@ class SavingApi {
     final body = decoded is Map<String, dynamic>
         ? decoded
         : <String, dynamic>{'data': decoded};
-    return SavingDetail.fromJson(
-        body['data'] as Map<String, dynamic>? ?? body);
+    return SavingDetail.fromJson(body['data'] as Map<String, dynamic>? ?? body);
   }
 
   /// POST /api/mobile/savings — create saving (old flow, no OTP)
@@ -387,8 +390,7 @@ class SavingApi {
     );
     _checkStatus(res);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return SavingDetail.fromJson(
-        body['data'] as Map<String, dynamic>? ?? body);
+    return SavingDetail.fromJson(body['data'] as Map<String, dynamic>? ?? body);
   }
 
   /// POST /api/mobile/savings/open/initiate
@@ -414,7 +416,8 @@ class SavingApi {
         if (agreementVersion != null) 'agreementVersion': agreementVersion,
       },
       parser: (decoded) => SavingOpenInitiateResponse.fromJson(
-          (decoded as Map).cast<String, dynamic>()),
+        (decoded as Map).cast<String, dynamic>(),
+      ),
     );
     return res;
   }
@@ -428,7 +431,8 @@ class SavingApi {
       '/api/mobile/savings/open/confirm',
       body: {'transactionId': transactionId, 'otpCode': otpCode},
       parser: (decoded) => SavingOpenConfirmResponse.fromJson(
-          (decoded as Map).cast<String, dynamic>()),
+        (decoded as Map).cast<String, dynamic>(),
+      ),
     );
     return res;
   }
@@ -491,7 +495,8 @@ class SavingApi {
     if (decoded is List) return decoded;
     if (decoded is Map<String, dynamic>) {
       if (decoded['data'] is List) return decoded['data'] as List<dynamic>;
-      if (decoded['content'] is List) return decoded['content'] as List<dynamic>;
+      if (decoded['content'] is List)
+        return decoded['content'] as List<dynamic>;
       if (decoded['items'] is List) return decoded['items'] as List<dynamic>;
     }
     return [];
@@ -514,9 +519,13 @@ class SavingApi {
 class Saving {
   final int id;
   final String code;
+  final String productName;
   final String principalAmount;
+  final double actualInterestRate;
+  final int termValue;
   final String accruedInterestAmount;
   final String postedInterestAmount;
+  final String earnedInterestAmount;
   final String status;
   final String interestAccrualFrequency;
   final String interestPostingFrequency;
@@ -527,9 +536,13 @@ class Saving {
   Saving({
     required this.id,
     required this.code,
+    required this.productName,
     required this.principalAmount,
+    required this.actualInterestRate,
+    required this.termValue,
     required this.accruedInterestAmount,
     required this.postedInterestAmount,
+    required this.earnedInterestAmount,
     required this.status,
     required this.interestAccrualFrequency,
     required this.interestPostingFrequency,
@@ -538,12 +551,29 @@ class Saving {
     this.projectedMaturityAmount,
   });
 
+  static double _computedEarnedInterest(SavingDetail d) {
+    final explicit = d.earnedInterestAmount ?? d.postedInterestAmount + d.accruedInterestAmount;
+    if (explicit > 0) return explicit;
+    final open = d.openDate == null ? null : DateTime.tryParse(d.openDate!);
+    if (open == null || d.principalAmount <= 0 || d.actualInterestRate <= 0) return explicit;
+    final maturity = d.maturityDate == null ? null : DateTime.tryParse(d.maturityDate!);
+    final now = DateTime.now();
+    final end = maturity != null && now.isAfter(maturity) ? maturity : now;
+    final days = end.difference(open).inDays;
+    if (days <= 0) return explicit;
+    return d.principalAmount * (d.actualInterestRate / 100) * days / 365;
+  }
+
   factory Saving.fromDetail(SavingDetail d) => Saving(
     id: d.id,
     code: d.code,
+    productName: d.productName,
     principalAmount: d.principalAmount.toStringAsFixed(0),
+    actualInterestRate: d.actualInterestRate,
+    termValue: d.termValue,
     accruedInterestAmount: d.accruedInterestAmount.toStringAsFixed(0),
     postedInterestAmount: d.postedInterestAmount.toStringAsFixed(0),
+    earnedInterestAmount: _computedEarnedInterest(d).toStringAsFixed(0),
     status: d.status,
     interestAccrualFrequency: 'MONTHLY',
     interestPostingFrequency: 'END_OF_TERM',
