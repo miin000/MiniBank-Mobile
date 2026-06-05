@@ -1,5 +1,6 @@
-import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
+Future<String?> decodeQrWeb(dynamic bytes) async => null;
 
 Future<String?> decodeQrMobile(String path) async {
   final controller = MobileScannerController();

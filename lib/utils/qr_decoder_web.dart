@@ -6,6 +6,8 @@ import 'package:web/web.dart';
 @JS('jsQR')
 external JSObject? _jsQR(JSUint8ClampedArray data, int width, int height);
 
+Future<String?> decodeQrMobile(String path) async => null;
+
 Future<String?> decodeQrWeb(Uint8List bytes) async {
   // Dùng Canvas để decode image bytes -> pixel data
   final blob = Blob([bytes.toJS].toJS);
