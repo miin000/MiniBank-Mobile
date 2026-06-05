@@ -22,9 +22,14 @@ Future<void> main() async {
   final defaultBaseUrl = kIsWeb
       ? 'http://localhost:8081'
       : (Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081');
+  final normalizedEnvBaseUrl = !kIsWeb && Platform.isAndroid && envBaseUrl != null
+      ? envBaseUrl
+          .replaceFirst('http://localhost:', 'http://10.0.2.2:')
+          .replaceFirst('http://127.0.0.1:', 'http://10.0.2.2:')
+      : envBaseUrl;
   final apiBaseUrl = apiBaseUrlOverride.isNotEmpty
       ? apiBaseUrlOverride
-      : (envBaseUrl != null && envBaseUrl.isNotEmpty ? envBaseUrl : defaultBaseUrl);
+      : (normalizedEnvBaseUrl != null && normalizedEnvBaseUrl.isNotEmpty ? normalizedEnvBaseUrl : defaultBaseUrl);
   // NOTE:
   // - Android emulator: use http://10.0.2.2:8081
   // - iOS simulator: http://localhost:8081
@@ -54,6 +59,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MiniBank',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue)),
       home: FutureBuilder<String?>(
         future: storage.getToken(),

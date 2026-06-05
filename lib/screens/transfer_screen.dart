@@ -174,6 +174,7 @@ class _TransferScreenState extends State<TransferScreen> {
     if (raw.contains('Invalid OTP')) return 'OTP không đúng. Vui lòng thử lại.';
     if (raw.contains('Invalid PIN')) return 'PIN không đúng. Vui lòng thử lại.';
     if (raw.contains('Transaction PIN is not set')) return 'Bạn chưa cài đặt PIN giao dịch.';
+    if (raw.contains('Account not found')) return 'Không tìm thấy tài khoản nhận.';
     if (raw.contains('Recipient account not found')) return 'Không tìm thấy tài khoản nhận.';
     if (raw.contains('Recipient account is not active')) return 'Tài khoản nhận không hoạt động.';
     if (raw.contains('Insufficient balance')) return 'Số dư không đủ để thực hiện giao dịch.';

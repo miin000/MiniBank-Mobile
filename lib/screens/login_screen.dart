@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../auth/auth_api.dart';
 import '../auth/auth_storage.dart';
@@ -11,7 +10,6 @@ import 'pin_verify_screen.dart';
 import 'forgot_password_screen.dart';
 
 const _blue = Color(0xFF1B4FD8);
-const _blueDark = Color(0xFF1240AC);
 const _gray200 = Color(0xFFE5E7EB);
 const _gray400 = Color(0xFF9CA3AF);
 const _gray900 = Color(0xFF111827);
@@ -63,7 +61,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; _devOtpHint = null; });
     try {
       _deviceId = await widget.identity.getOrCreateDeviceId();
-      _publicKeyPem = kIsWeb ? null : await widget.identity.getOrCreatePublicKeyPem();
+      // Sending OTP only needs the stable device id. Avoid generating key material here
+      // because some emulator/mobile crypto paths can throw before the network call starts.
+      _publicKeyPem = null;
       final res = await widget.api.sendLoginOtp(
         phone: _phoneCtrl.text.trim(),
         deviceId: _deviceId!,
@@ -90,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       _deviceId ??= await widget.identity.getOrCreateDeviceId();
-      _publicKeyPem ??= kIsWeb ? null : await widget.identity.getOrCreatePublicKeyPem();
+      _publicKeyPem ??= null;
       final res = await widget.api.verifyLogin(
         phone: _phoneCtrl.text.trim(),
         otpCode: _otpCtrl.text.trim(),

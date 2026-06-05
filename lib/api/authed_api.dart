@@ -10,6 +10,29 @@ class AuthedApi {
 
   const AuthedApi({required this.baseUrl, required this.storage});
 
+  String _errorMessage(http.Response res) {
+    if (res.body.isEmpty) return 'Request failed';
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map) {
+        final message = decoded['message'] ?? decoded['error'];
+        if (message != null && message.toString().trim().isNotEmpty) {
+          return message.toString();
+        }
+      }
+    } catch (_) {}
+    return res.body;
+  }
+
+  Uri _uri(String path, [Map<String, String>? query]) {
+    final uri = Uri.parse('$baseUrl$path');
+    if (query == null || query.isEmpty) return uri;
+    return uri.replace(queryParameters: {
+      ...uri.queryParameters,
+      ...query,
+    });
+  }
+
   Future<Map<String, String>> _headers() async {
     final token = await storage.getToken();
     return {
@@ -20,9 +43,9 @@ class AuthedApi {
   }
 
   /// HTTP GET
-  Future<http.Response> get(String path) async {
+  Future<http.Response> get(String path, {Map<String, String>? query}) async {
     final headers = await _headers();
-    return http.get(Uri.parse('$baseUrl$path'), headers: headers);
+    return http.get(_uri(path, query), headers: headers);
   }
 
   /// HTTP POST
@@ -67,9 +90,9 @@ class AuthedApi {
     Map<String, String>? query,
     required T Function(Object? decoded) parser,
   }) async {
-    final res = await get(path).timeout(const Duration(seconds: 30));
+    final res = await get(path, query: query).timeout(const Duration(seconds: 30));
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
+      throw Exception(_errorMessage(res));
     }
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     return parser(decoded);
@@ -82,7 +105,7 @@ class AuthedApi {
   }) async {
     final res = await post(path, body: jsonEncode(body)).timeout(const Duration(seconds: 30));
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
+      throw Exception(_errorMessage(res));
     }
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     return parser(decoded);
@@ -95,7 +118,7 @@ class AuthedApi {
   }) async {
     final res = await put(path, body: jsonEncode(body)).timeout(const Duration(seconds: 30));
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
+      throw Exception(_errorMessage(res));
     }
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     return parser(decoded);
@@ -108,7 +131,7 @@ class AuthedApi {
   }) async {
     final res = await patch(path, body: jsonEncode(body)).timeout(const Duration(seconds: 30));
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception(res.body.isNotEmpty ? res.body : 'Request failed');
+      throw Exception(_errorMessage(res));
     }
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     return parser(decoded);

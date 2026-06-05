@@ -48,6 +48,7 @@ class _KycScreenState extends State<KycScreen> {
   bool _uploadingBack = false;
   bool _uploadingPortrait = false;
   bool _kycLocked = false;
+  bool _kycPending = false;
   String? _status;
 
   bool _loading = false;
@@ -84,7 +85,11 @@ class _KycScreenState extends State<KycScreen> {
       final profile = await api.me();
       if (!mounted) return;
       final status = profile.status?.toLowerCase();
-      setState(() { _status = profile.status; _kycLocked = status == 'active'; });
+      setState(() {
+        _status = profile.status;
+        _kycLocked = status == 'active' || status == 'pending';
+        _kycPending = status == 'pending';
+      });
     } catch (_) {}
   }
 
@@ -156,7 +161,7 @@ class _KycScreenState extends State<KycScreen> {
   }
 
   Future<void> _sendOtp() async {
-    if (_kycLocked) { setState(() => _error = 'Tài khoản đã được duyệt KYC.'); return; }
+    if (_kycLocked) { setState(() => _error = _kycPending ? 'Bạn đã gửi yêu cầu KYC. Vui lòng chờ admin duyệt.' : 'Tài khoản đã được duyệt KYC.'); return; }
     setState(() { _sendingOtp = true; _error = null; _devOtpHint = null; });
     try {
       final api = KycApi(baseUrl: widget.baseUrl, storage: widget.storage);
@@ -174,7 +179,7 @@ class _KycScreenState extends State<KycScreen> {
   }
 
   Future<void> _submit() async {
-    if (_kycLocked) { setState(() => _error = 'Tài khoản đã được duyệt KYC.'); return; }
+    if (_kycLocked) { setState(() => _error = _kycPending ? 'Bạn đã gửi yêu cầu KYC. Vui lòng chờ admin duyệt.' : 'Tài khoản đã được duyệt KYC.'); return; }
     if (!_formKey.currentState!.validate()) return;
     if (_citizenFrontImageUrl == null) { setState(() => _error = 'Vui lòng tải ảnh CCCD mặt trước.'); return; }
     if (_citizenBackImageUrl == null) { setState(() => _error = 'Vui lòng tải ảnh CCCD mặt sau.'); return; }
@@ -218,7 +223,14 @@ class _KycScreenState extends State<KycScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Status banner
-          if (_kycLocked)
+          if (_kycPending)
+            _InfoBanner(
+              icon: Icons.hourglass_top_rounded,
+              message: 'Bạn đã gửi yêu cầu KYC. Vui lòng chờ admin duyệt trước khi gửi lại.',
+              color: const Color(0xFFD97706),
+              bgColor: const Color(0xFFFFF7ED),
+            )
+          else if (_kycLocked)
             _InfoBanner(
               icon: Icons.verified_rounded,
               message: 'KYC đã được duyệt${_status != null ? ' • Trạng thái: $_status' : ''}.',

@@ -42,7 +42,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   AuthUser? _user;
   int _navIndex = 0;
   AccountSummary? _summary;
@@ -67,8 +68,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _balanceAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _balanceFade = CurvedAnimation(parent: _balanceAnimCtrl, curve: Curves.easeOut);
+    _balanceAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _balanceFade = CurvedAnimation(
+      parent: _balanceAnimCtrl,
+      curve: Curves.easeOut,
+    );
     widget.storage.getUser().then((u) {
       if (!mounted) return;
       setState(() => _user = u);
@@ -114,11 +121,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _openTransfer() async {
     final completed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => TransferScreen(
-        baseUrl: widget.baseUrl,
-        storage: widget.storage,
-        identity: widget.identity,
-      )),
+      MaterialPageRoute(
+        builder: (_) => TransferScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+          identity: widget.identity,
+        ),
+      ),
     );
     if (completed == true) {
       await _loadSummary();
@@ -128,11 +137,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _openQr() async {
     final needsReload = await Navigator.of(context).push<bool?>(
-      MaterialPageRoute(builder: (_) => QrScreen(
-        baseUrl: widget.baseUrl,
-        storage: widget.storage,
-        identity: widget.identity,
-      )),
+      MaterialPageRoute(
+        builder: (_) => QrScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+          identity: widget.identity,
+        ),
+      ),
     );
     if (needsReload == true && mounted) {
       await _loadSummary();
@@ -140,22 +151,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  void _openKyc() => Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => KycScreen(baseUrl: widget.baseUrl, storage: widget.storage)));
+  void _openKyc() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) =>
+          KycScreen(baseUrl: widget.baseUrl, storage: widget.storage),
+    ),
+  );
 
-  void _openProfile() => Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProfileScreen(
-          baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
-
-  void _openServices() => Navigator.of(context).push(
+  Future<void> _openKycAndReload() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ServicesScreen(
-          baseUrl: widget.baseUrl,
-          storage: widget.storage,
-          identity: widget.identity,
-        ),
+        builder: (_) =>
+            KycScreen(baseUrl: widget.baseUrl, storage: widget.storage),
       ),
     );
+    if (!mounted) return;
+    await _loadProfile();
+    await _loadSummary();
+  }
+
+  void _openProfile() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ProfileScreen(
+        baseUrl: widget.baseUrl,
+        storage: widget.storage,
+        identity: widget.identity,
+      ),
+    ),
+  );
+
+  void _openServices() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ServicesScreen(
+        baseUrl: widget.baseUrl,
+        storage: widget.storage,
+        identity: widget.identity,
+      ),
+    ),
+  );
 
   Future<void> _openLoanApplication() async {
     final submitted = await Navigator.of(context).push<bool>(
@@ -193,13 +226,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-    void _openChatbot() => Navigator.of(context).push(MaterialPageRoute(
+  void _openChatbot() => Navigator.of(context).push(
+    MaterialPageRoute(
       builder: (_) => ChatbotScreen(
         baseUrl: widget.baseUrl,
         wsUrl: toWsUrl(widget.baseUrl),
-        storage: widget.storage
-
-        )));
+        storage: widget.storage,
+      ),
+    ),
+  );
 
   void _openHistory() {
     Navigator.of(context).push(
@@ -215,15 +250,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _openNotifications() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => NotificationScreen(baseUrl: widget.baseUrl, storage: widget.storage),
+        builder: (_) => NotificationScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
       ),
     );
   }
 
   void _openAccountSetup() async {
     final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => AccountSetupScreen(
-          baseUrl: widget.baseUrl, storage: widget.storage)),
+      MaterialPageRoute(
+        builder: (_) => AccountSetupScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
     );
     if (created == true) {
       await _loadSummary();
@@ -241,13 +283,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _profileStatus = profile.status;
         _profileAccountCount = profile.accounts.length;
       });
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       if (mounted) setState(() => _loadingProfile = false);
     }
   }
 
   Future<void> _loadSummary() async {
-    setState(() { _loadingSummary = true; _summaryError = null; });
+    setState(() {
+      _loadingSummary = true;
+      _summaryError = null;
+    });
     try {
       final api = AccountApi(baseUrl: widget.baseUrl, storage: widget.storage);
       final summary = await api.summary();
@@ -259,9 +305,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final msg = e.toString();
       if (msg.contains('No account is assigned')) {
         final status = (_profileStatus ?? '').toLowerCase();
-        setState(() => _summaryError = status == 'active'
-            ? 'Bạn đã được duyệt KYC. Hãy tạo số tài khoản để sử dụng dịch vụ.'
-            : 'Bạn chưa có tài khoản. Hãy hoàn tất KYC và chờ admin duyệt.');
+        setState(
+          () => _summaryError = status == 'active'
+              ? 'Bạn đã được duyệt KYC. Hãy tạo số tài khoản để sử dụng dịch vụ.'
+              : 'Bạn chưa có tài khoản. Hãy hoàn tất KYC và chờ admin duyệt.',
+        );
       } else {
         setState(() => _summaryError = msg);
       }
@@ -271,9 +319,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _loadRecent() async {
-    setState(() { _loadingRecent = true; _recentError = null; });
+    setState(() {
+      _loadingRecent = true;
+      _recentError = null;
+    });
     try {
-      final api = TransactionApi(baseUrl: widget.baseUrl, storage: widget.storage);
+      final api = TransactionApi(
+        baseUrl: widget.baseUrl,
+        storage: widget.storage,
+      );
       final recent = await api.recent(limit: 5);
       if (!mounted) return;
       setState(() => _recent = recent);
@@ -291,7 +345,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       _aiRecommendationError = null;
     });
     try {
-      final authedApi = AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage);
+      final authedApi = AuthedApi(
+        baseUrl: widget.baseUrl,
+        storage: widget.storage,
+      );
       final api = ExpenseApi(api: authedApi);
       final recommendation = await api.getDailyRecommendation();
       if (!mounted) return;
@@ -357,9 +414,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 6),
-          Text(label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -374,7 +433,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   String _recommendationSourceLabel(String source) {
-    return source == 'RULE_BASED_AND_GEMINI' ? 'Gemini AI' : 'Quy tắc thông minh';
+    return source == 'RULE_BASED_AND_GEMINI'
+        ? 'Gemini AI'
+        : 'Quy tắc thông minh';
   }
 
   Widget _buildAiAdvisorCard() {
@@ -388,7 +449,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: recommendation == null ? _loadAiRecommendation : _showAiRecommendationsSheet,
+      onTap: recommendation == null
+          ? _loadAiRecommendation
+          : _showAiRecommendationsSheet,
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
         padding: const EdgeInsets.all(16),
@@ -406,49 +469,86 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: accent.withOpacity(0.12), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: accent.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
               child: _loadingAiRecommendation
                   ? Padding(
                       padding: const EdgeInsets.all(11),
-                      child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: accent,
+                      ),
                     )
                   : Icon(Icons.auto_awesome_rounded, color: accent, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  const Expanded(
-                    child: Text('Cố vấn chi tiêu AI',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Cố vấn chi tiêu AI',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ),
+                      if (recommendation != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: accent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            _recommendationSourceLabel(recommendation.source),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: accent,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  if (recommendation != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
-                      child: Text(
-                        _recommendationSourceLabel(recommendation.source),
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accent),
+                  const SizedBox(height: 4),
+                  Text(
+                    _loadingAiRecommendation
+                        ? 'Đang phân tích chi tiêu của bạn...'
+                        : _aiRecommendationError != null
+                        ? 'Không tải được đề xuất. Nhấn để thử lại.'
+                        : firstItem?.message ?? 'Chưa có đề xuất chi tiêu mới.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: accent.withOpacity(0.82),
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (recommendation != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Điểm tiết kiệm: ${recommendation.savingScore}/100 • Rủi ro: ${recommendation.riskLevel}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                ]),
-                const SizedBox(height: 4),
-                Text(
-                  _loadingAiRecommendation
-                      ? 'Đang phân tích chi tiêu của bạn...'
-                      : _aiRecommendationError != null
-                          ? 'Không tải được đề xuất. Nhấn để thử lại.'
-                          : firstItem?.message ?? 'Chưa có đề xuất chi tiêu mới.',
-                  style: TextStyle(fontSize: 12, color: accent.withOpacity(0.82), height: 1.4),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (recommendation != null) ...[
-                  const SizedBox(height: 8),
-                  Text('Điểm tiết kiệm: ${recommendation.savingScore}/100 • Rủi ro: ${recommendation.riskLevel}',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontWeight: FontWeight.w600)),
+                  ],
                 ],
-              ]),
+              ),
             ),
             Icon(Icons.chevron_right, color: accent, size: 18),
           ],
@@ -463,39 +563,79 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Đề xuất chi tiêu ${recommendation.month}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF111827))),
-            const SizedBox(height: 6),
-            Text('${_recommendationSourceLabel(recommendation.source)} • Điểm tiết kiệm ${recommendation.savingScore}/100',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-            const SizedBox(height: 14),
-            ...recommendation.recommendations.map((item) {
-              final color = _recommendationColor(item.priority);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withOpacity(0.16)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Đề xuất chi tiêu ${recommendation.month}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111827),
                 ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.tips_and_updates_rounded, color: color, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(item.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
-                    const SizedBox(height: 4),
-                    Text(item.message, style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.35)),
-                  ])),
-                ]),
-              );
-            }),
-          ]),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_recommendationSourceLabel(recommendation.source)} • Điểm tiết kiệm ${recommendation.savingScore}/100',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 14),
+              ...recommendation.recommendations.map((item) {
+                final color = _recommendationColor(item.priority);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withOpacity(0.16)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.tips_and_updates_rounded,
+                        color: color,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: color,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.message,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF374151),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -513,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: SafeArea(
         child: Column(
           children: [
-            // ── Top Header ──────────────────────────────────────────────
+            //  Top Header
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
@@ -523,27 +663,47 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_greeting(),
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+                        Text(
+                          _greeting(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text(_displayName(),
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                        Text(
+                          _displayName(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   if (rank != null && rank.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: _rankColor(rank).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _rankColor(rank).withOpacity(0.3)),
+                        border: Border.all(
+                          color: _rankColor(rank).withOpacity(0.3),
+                        ),
                       ),
-                      child: Text(_rankLabel(rank),
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600, color: _rankColor(rank))),
+                      child: Text(
+                        _rankLabel(rank),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _rankColor(rank),
+                        ),
+                      ),
                     ),
                   IconButton(
                     icon: const Icon(Icons.notifications_none_rounded),
@@ -561,16 +721,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       await widget.storage.clear();
                       if (!context.mounted) return;
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => LoginScreen(
-                            baseUrl: widget.baseUrl, api: widget.api,
-                            storage: widget.storage, identity: widget.identity)),
+                        MaterialPageRoute(
+                          builder: (_) => LoginScreen(
+                            baseUrl: widget.baseUrl,
+                            api: widget.api,
+                            storage: widget.storage,
+                            identity: widget.identity,
+                          ),
+                        ),
                         (r) => false,
                       );
                     },
                     child: const CircleAvatar(
                       radius: 18,
                       backgroundColor: Color(0xFFEEF2FF),
-                      child: Icon(Icons.person, size: 18, color: Color(0xFF1B4FD8)),
+                      child: Icon(
+                        Icons.person,
+                        size: 18,
+                        color: Color(0xFF1B4FD8),
+                      ),
                     ),
                   ),
                 ],
@@ -580,12 +749,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await Future.wait([_loadSummary(), _loadRecent(), _loadProfile(), _loadAiRecommendation()]);
+                  await Future.wait([
+                    _loadSummary(),
+                    _loadRecent(),
+                    _loadProfile(),
+                    _loadAiRecommendation(),
+                  ]);
                 },
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
-                    // ── Balance Card ──────────────────────────────────────
+                    //  Balance Card
                     Container(
                       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                       decoration: BoxDecoration(
@@ -607,9 +781,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         children: [
                           // decorative circles
                           Positioned(
-                            right: -20, top: -20,
+                            right: -20,
+                            top: -20,
                             child: Container(
-                              width: 120, height: 120,
+                              width: 120,
+                              height: 120,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.white.withOpacity(0.06),
@@ -617,9 +793,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                           ),
                           Positioned(
-                            right: 30, bottom: -30,
+                            right: 30,
+                            bottom: -30,
                             child: Container(
-                              width: 90, height: 90,
+                              width: 90,
+                              height: 90,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.white.withOpacity(0.05),
@@ -632,15 +810,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text('Số dư khả dụng',
-                                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                    const Text(
+                                      'Số dư khả dụng',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                     GestureDetector(
-                                      onTap: summary == null ? null : () => setState(() => _hideBalance = !_hideBalance),
+                                      onTap: summary == null
+                                          ? null
+                                          : () => setState(
+                                              () =>
+                                                  _hideBalance = !_hideBalance,
+                                            ),
                                       child: Icon(
-                                        _hideBalance ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                        color: Colors.white70, size: 20),
+                                        _hideBalance
+                                            ? Icons.visibility_off_rounded
+                                            : Icons.visibility_rounded,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -650,18 +843,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         height: 38,
                                         child: Align(
                                           alignment: Alignment.centerLeft,
-                                          child: SizedBox(width: 24, height: 24,
-                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white54,
+                                            ),
+                                          ),
                                         ),
                                       )
                                     : FadeTransition(
                                         opacity: _balanceFade,
                                         child: Text(
                                           summary == null
-                                              ? '––'
+                                              ? '– –'
                                               : _hideBalance
-                                                  ? '••••••••'
-                                                  : '${_formatAmount(summary.availableBalance.toString())} VND',
+                                              ? '••••••••'
+                                              : '${_formatAmount(summary.availableBalance.toString())} VND',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 32,
@@ -670,40 +869,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                           ),
                                         ),
                                       ),
-                                const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(Icons.credit_card_rounded, color: Colors.white54, size: 15),
+                                    const Icon(
+                                      Icons.credit_card_rounded,
+                                      color: Colors.white54,
+                                      size: 15,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      summary == null ? '––' : summary.accountNumber,
-                                      style: const TextStyle(color: Colors.white70, fontSize: 14, letterSpacing: 0.5),
+                                      summary == null
+                                          ? '--'
+                                          : summary.accountNumber,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                     const Spacer(),
                                     GestureDetector(
-                                      onTap: summary == null ? null : () async {
-                                        await Clipboard.setData(ClipboardData(text: summary.accountNumber));
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                          content: const Text('Đã sao chép số tài khoản'),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          margin: const EdgeInsets.all(16),
-                                        ));
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: const Row(
-                                          children: [
-                                            Icon(Icons.copy_rounded, size: 13, color: Colors.white70),
-                                            SizedBox(width: 4),
-                                            Text('Sao chép', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                                          ],
-                                        ),
+                                      onTap: summary == null
+                                          ? null
+                                          : () async {
+                                              await Clipboard.setData(
+                                                ClipboardData(
+                                                  text: summary.accountNumber,
+                                                ),
+                                              );
+                                              if (!context.mounted) return;
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Đã sao chép số tài khoản',
+                                                  ),
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                  margin: EdgeInsets.all(16),
+                                                ),
+                                              );
+                                            },
+                                      child: const Icon(
+                                        Icons.copy_rounded,
+                                        color: Colors.white70,
+                                        size: 18,
                                       ),
                                     ),
                                   ],
@@ -711,21 +922,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
                                 if (_summaryError != null) ...[
                                   const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.info_outline, color: Colors.white70, size: 15),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(_summaryError!,
-                                              style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                                        ),
-                                      ],
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: isActive ? null : _openKycAndReload,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.info_outline,
+                                            color: Colors.white70,
+                                            size: 15,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _summaryError!,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          if (!isActive)
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: Colors.white70,
+                                              size: 18,
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -735,11 +968,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   SizedBox(
                                     width: double.infinity,
                                     child: OutlinedButton(
-                                      onPressed: _loadingProfile ? null : _openAccountSetup,
+                                      onPressed: _loadingProfile
+                                          ? null
+                                          : _openAccountSetup,
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: Colors.white,
-                                        side: const BorderSide(color: Colors.white54),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        side: const BorderSide(
+                                          color: Colors.white54,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
                                       ),
                                       child: const Text('Tạo số tài khoản'),
                                     ),
@@ -751,13 +992,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   width: double.infinity,
                                   child: OutlinedButton.icon(
                                     onPressed: summary == null ? null : _openQr,
-                                    icon: const Icon(Icons.qr_code_rounded, size: 16, color: Colors.white),
-                                    label: const Text('Hiển thị QR nhận tiền',
-                                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                                    icon: const Icon(
+                                      Icons.qr_code_rounded,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                    label: const Text(
+                                      'Hiển thị QR nhận tiền',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                     style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Colors.white30),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      side: const BorderSide(
+                                        color: Colors.white30,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -768,7 +1024,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
 
-                    // ── Transaction Limits ────────────────────────────────
+                    //  Transaction Limits
                     if (summary != null) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -777,7 +1033,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             Expanded(
                               child: _limitCard(
                                 label: 'Hạn mức chuyển',
-                                value: _formatAmount(summary.dailyTransferLimit?.toString() ?? '0'),
+                                value: _formatAmount(
+                                  summary.dailyTransferLimit?.toString() ?? '0',
+                                ),
                                 icon: Icons.trending_up_rounded,
                                 color: const Color(0xFFFFF7ED),
                                 iconColor: const Color(0xFFD97706),
@@ -787,7 +1045,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             Expanded(
                               child: _limitCard(
                                 label: 'Hạn mức nhận',
-                                value: _formatAmount(summary.dailyReceiveLimit?.toString() ?? '0'),
+                                value: _formatAmount(
+                                  summary.dailyReceiveLimit?.toString() ?? '0',
+                                ),
                                 icon: Icons.trending_down_rounded,
                                 color: const Color(0xFFF0FDF4),
                                 iconColor: const Color(0xFF16A34A),
@@ -798,15 +1058,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ],
 
-                    // ── Quick Actions ─────────────────────────────────────
+                    //  Quick Actions
                     Container(
                       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Row(
@@ -834,31 +1101,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             icon: Icons.bar_chart_rounded,
                             label: 'Lịch sử',
                             color: const Color(0xFF0D9488),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
                                 builder: (_) => TransactionHistoryScreen(
-                                    baseUrl: widget.baseUrl, storage: widget.storage))),
+                                  baseUrl: widget.baseUrl,
+                                  storage: widget.storage,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
 
-                    // ── AI Advisor Banner ─────────────────────────────────
+                    //  AI Advisor Banner
                     _buildAiAdvisorCard(),
 
-                    // ── Recent Transactions ───────────────────────────────
+                    //  Recent Transactions
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Giao dịch gần đây',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                          const Text(
+                            'Giao dịch gần đây',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
                           TextButton(
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
                                 builder: (_) => TransactionHistoryScreen(
-                                    baseUrl: widget.baseUrl, storage: widget.storage))),
-                            style: TextButton.styleFrom(foregroundColor: _primaryBlue),
-                            child: const Text('Xem tất cả', style: TextStyle(fontSize: 13)),
+                                  baseUrl: widget.baseUrl,
+                                  storage: widget.storage,
+                                ),
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: _primaryBlue,
+                            ),
+                            child: const Text(
+                              'Xem tất cả',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ),
                         ],
                       ),
@@ -870,7 +1158,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: _buildRecentTransactions(),
@@ -881,12 +1173,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: OutlinedButton.icon(
                         onPressed: _openProfile,
-                        icon: const Icon(Icons.manage_accounts_rounded, size: 18),
+                        icon: const Icon(
+                          Icons.manage_accounts_rounded,
+                          size: 18,
+                        ),
                         label: const Text('Hồ sơ / Bảo mật / Cài đặt'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF374151),
                           side: const BorderSide(color: Color(0xFFE5E7EB)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -901,7 +1198,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
         child: SafeArea(
           top: false,
@@ -912,16 +1215,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             elevation: 0,
             selectedItemColor: _primaryBlue,
             unselectedItemColor: const Color(0xFF9CA3AF),
-            selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            selectedLabelStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
             unselectedLabelStyle: const TextStyle(fontSize: 11),
             onTap: (index) async {
-              if (index == 0) { setState(() => _navIndex = 0); return; }
-              if (index == 1) {
-                await Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => TransactionHistoryScreen(
-                        baseUrl: widget.baseUrl, storage: widget.storage)));
+              if (index == 0) {
+                setState(() => _navIndex = 0);
+                return;
               }
-              if (index == 2) { await _openQr(); }
+              if (index == 1) {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TransactionHistoryScreen(
+                      baseUrl: widget.baseUrl,
+                      storage: widget.storage,
+                    ),
+                  ),
+                );
+              }
+              if (index == 2) {
+                await _openQr();
+              }
               if (index == 3) {
                 if (!mounted) return;
                 await Navigator.of(context).push(
@@ -935,21 +1251,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 );
               }
               if (index == 4) {
-                await Navigator.of(context).push(MaterialPageRoute(
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
                     builder: (_) => ProfileScreen(
-                        baseUrl: widget.baseUrl, storage: widget.storage, identity: widget.identity)));
+                      baseUrl: widget.baseUrl,
+                      storage: widget.storage,
+                      identity: widget.identity,
+                    ),
+                  ),
+                );
               }
               if (mounted) setState(() => _navIndex = 0);
             },
             items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Trang chủ'),
-              BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'Lịch sử'),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Trang chủ',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                label: 'Lịch sử',
+              ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.qr_code_scanner_rounded, size: 28),
                 label: 'Quét QR',
               ),
-              BottomNavigationBarItem(icon: Icon(Icons.apps_rounded), label: 'Tiện ích'),
-              BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Cá nhân'),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.apps_rounded),
+                label: 'Tiện ích',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Cá nhân',
+              ),
             ],
           ),
         ),
@@ -978,11 +1312,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: iconColor.withOpacity(0.8))),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: iconColor.withOpacity(0.8),
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text('$value VND/ngày',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: iconColor),
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  '$value VND/ngày',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: iconColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -1001,7 +1347,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (_recentError != null) {
       return Padding(
         padding: const EdgeInsets.all(20),
-        child: Text(_recentError!, style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+        child: Text(
+          _recentError!,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        ),
       );
     }
     if (_recent.isEmpty) {
@@ -1010,9 +1359,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.receipt_long_rounded, size: 36, color: Color(0xFFD1D5DB)),
+              Icon(
+                Icons.receipt_long_rounded,
+                size: 36,
+                color: Color(0xFFD1D5DB),
+              ),
               SizedBox(height: 8),
-              Text('Chưa có giao dịch nào', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+              Text(
+                'Chưa có giao dịch nào',
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -1024,37 +1380,67 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         final i = entry.key;
         final tx = entry.value;
         final incoming = tx.direction == 'in';
-        final amountColor = incoming ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
-        final bgColor = incoming ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2);
-        final iconColor = incoming ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+        final amountColor = incoming
+            ? const Color(0xFF16A34A)
+            : const Color(0xFFDC2626);
+        final bgColor = incoming
+            ? const Color(0xFFF0FDF4)
+            : const Color(0xFFFEF2F2);
+        final iconColor = incoming
+            ? const Color(0xFF16A34A)
+            : const Color(0xFFDC2626);
         final title = tx.counterpartyName?.isNotEmpty == true
             ? (incoming ? tx.counterpartyName! : tx.counterpartyName!)
             : (incoming ? 'Nhận tiền' : 'Chuyển tiền');
         final desc = tx.description == null || tx.description!.isEmpty
-            ? tx.transactionType : tx.description!;
+            ? tx.transactionType
+            : tx.description!;
 
         return Column(
           children: [
             if (i > 0) const Divider(height: 1, indent: 72),
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
               leading: Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(
-                  incoming ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                  color: iconColor, size: 20,
+                  incoming
+                      ? Icons.arrow_downward_rounded
+                      : Icons.arrow_upward_rounded,
+                  color: iconColor,
+                  size: 20,
                 ),
               ),
-              title: Text(title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(desc,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                desc,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: Text(
                 '${incoming ? '+' : '-'}${tx.amount} VND',
-                style: TextStyle(color: amountColor, fontWeight: FontWeight.w700, fontSize: 14),
+                style: TextStyle(
+                  color: amountColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
