@@ -66,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _publicKeyPem = null;
       final res = await widget.api.sendLoginOtp(
         phone: _phoneCtrl.text.trim(),
+        password: _passwordCtrl.text,
         deviceId: _deviceId!,
         publicKeyPem: _publicKeyPem,
       );

@@ -13,7 +13,10 @@ import 'create_saving_screen.dart';
 import 'create_service_request_screen.dart';
 import 'expense_management_screen.dart';
 import 'limit_change_request_screen.dart';
+import 'loan_application_history_screen.dart';
 import 'profile_change_request_screen.dart';
+import 'saving_application_history_screen.dart';
+import 'service_request_history_screen.dart';
 
 class _C {
   static const bg = Color(0xFFF7F8FC);
@@ -286,6 +289,42 @@ class _ServicesScreenState extends State<ServicesScreen> {
     _loadLoanApplications();
   }
 
+  Future<void> _openSavingHistoryScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SavingApplicationHistoryScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+    if (mounted) _loadSavings();
+  }
+
+  Future<void> _openLoanHistoryScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LoanApplicationHistoryScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+    if (mounted) _loadLoanApplications();
+  }
+
+  Future<void> _openServiceRequestHistoryScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServiceRequestHistoryScreen(
+          baseUrl: widget.baseUrl,
+          storage: widget.storage,
+        ),
+      ),
+    );
+    if (mounted) _loadServiceRequests();
+  }
+
   Widget _statCard({
     required String label,
     required String value,
@@ -361,6 +400,67 @@ class _ServicesScreenState extends State<ServicesScreen> {
         ]),
       ),
     );
+  }
+
+  Widget _historyTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: _C.border)),
+        child: Row(children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.textPrimary)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(fontSize: 12, color: _C.textSecondary)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right, color: _C.textSecondary),
+        ]),
+      ),
+    );
+  }
+
+  Widget _historySection() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader('Lịch sử yêu cầu'),
+      _historyTile(
+        title: 'Lịch sử mở sổ tiết kiệm',
+        subtitle: 'Xem tất cả hồ sơ chờ duyệt, đã duyệt, từ chối',
+        icon: Icons.savings_outlined,
+        color: _C.green,
+        onTap: _openSavingHistoryScreen,
+      ),
+      _historyTile(
+        title: 'Lịch sử đăng ký vay vốn',
+        subtitle: 'Theo dõi hồ sơ vay và trạng thái xử lý',
+        icon: Icons.credit_score_outlined,
+        color: _C.blue,
+        onTap: _openLoanHistoryScreen,
+      ),
+      _historyTile(
+        title: 'Lịch sử yêu cầu dịch vụ',
+        subtitle: 'Lọc theo trạng thái và loại yêu cầu',
+        icon: Icons.assignment_outlined,
+        color: _C.purple,
+        onTap: _openServiceRequestHistoryScreen,
+      ),
+    ]);
   }
 
   Widget _quickAction({
@@ -447,7 +547,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final color = _statusColor(status);
     final code = _safeDynamicValue(() => saving.code);
     final amount = _safeDynamicValue(() => saving.principalAmount);
-    final createdAt = _safeDynamicValue(() => saving.createdAt);
+    final createdAt = _safeDynamicValue(() => saving.openDate);
     return _pendingTile(
       icon: Icons.savings_outlined,
       color: color,
@@ -672,10 +772,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
             ),
             const SizedBox(height: 24),
             _pendingSection(),
+            _historySection(),
+            const SizedBox(height: 14),
             Container(
               key: _requestSectionKey,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _sectionHeader('Yêu cầu dịch vụ'),
+                _sectionHeader('Tạo yêu cầu dịch vụ'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 10,
@@ -716,8 +818,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _buildServiceRequestsSection(),
               ]),
             ),
           ],

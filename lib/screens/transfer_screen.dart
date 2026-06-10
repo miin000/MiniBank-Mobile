@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api/account_api.dart';
 import '../api/profile_api.dart';
@@ -170,6 +171,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   String _friendlyError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('Validation failed') || raw.contains('transferConfirmRequest')) return 'Vui lòng nhập mã OTP 6 số.';
     if (raw.contains('RangeError')) return 'Lỗi ký số. Vui lòng thử lại.';
     if (raw.contains('Invalid OTP')) return 'OTP không đúng. Vui lòng thử lại.';
     if (raw.contains('Invalid PIN')) return 'PIN không đúng. Vui lòng thử lại.';
@@ -304,10 +306,15 @@ class _TransferScreenState extends State<TransferScreen> {
   Future<void> _confirmTransfer() async {
     final init = _init;
     if (init == null) return;
+    final otp = _otpCtrl.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+      setState(() => _error = 'Vui lòng nhập mã OTP 6 số.');
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       final api = TransferApi(baseUrl: widget.baseUrl, storage: widget.storage);
-      final res = await api.confirm(transactionId: init.transactionId, otpCode: _otpCtrl.text.trim());
+      final res = await api.confirm(transactionId: init.transactionId, otpCode: otp);
       if (!mounted) return;
       setState(() { _confirm = res; _step = _TransferStep.success; });
     } catch (e) {
@@ -749,7 +756,13 @@ class _TransferScreenState extends State<TransferScreen> {
                 _NumpadRow(keys: ['7', '8', '9'], onPressed: _pinInput, onDelete: null),
                 _NumpadRow(
                   keys: ['', '0', 'del'],
-                  onPressed: (v) { if (v == '') _pinClear(); else _pinInput(v); },
+                  onPressed: (v) {
+                    if (v == '') {
+                      _pinClear();
+                    } else {
+                      _pinInput(v);
+                    }
+                  },
                   onDelete: _pinDelete,
                 ),
               ],
@@ -839,6 +852,7 @@ class _TransferScreenState extends State<TransferScreen> {
           child: TextField(
             controller: _otpCtrl,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
             maxLength: 6,
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 12, color: _gray900),
             textAlign: TextAlign.center,
@@ -877,7 +891,7 @@ class _TransferScreenState extends State<TransferScreen> {
               children: [
                 const Icon(Icons.developer_mode, size: 14, color: Color(0xFFD97706)),
                 const SizedBox(width: 6),
-                Text('Dev: ${init!.debugOtp}',
+                Text('Dev: ${init.debugOtp}',
                     style: const TextStyle(fontSize: 12, color: Color(0xFFD97706), fontFamily: 'monospace')),
               ],
             ),

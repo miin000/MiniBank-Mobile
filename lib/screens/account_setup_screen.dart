@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api/account_api.dart';
@@ -22,17 +24,22 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
   final _desiredCtrl = TextEditingController();
 
   bool _loading = false;
+  bool _generateCooldown = false;
+  bool _hasGeneratedSuggestions = false;
+  Timer? _cooldownTimer;
   String? _error;
   List<String> _suggestions = const [];
   String? _selectedAccountNumber;
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _desiredCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _generateSuggestions() async {
+    if (_generateCooldown) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -48,6 +55,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
       if (!mounted) return;
       setState(() {
         _suggestions = data.suggestions;
+        _hasGeneratedSuggestions = true;
         if (_suggestions.isNotEmpty) {
           _selectedAccountNumber = _suggestions.first;
         }
@@ -56,7 +64,16 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _generateCooldown = true;
+        });
+        _cooldownTimer?.cancel();
+        _cooldownTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _generateCooldown = false);
+        });
+      }
     }
   }
 
@@ -132,8 +149,14 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
             children: [
               Expanded(
                 child: FilledButton.tonal(
-                  onPressed: _loading ? null : _generateSuggestions,
-                  child: Text(_loading ? 'Dang sinh...' : 'Sinh danh sach'),
+                  onPressed: (_loading || _generateCooldown) ? null : _generateSuggestions,
+                  child: Text(_loading
+                      ? 'Dang sinh...'
+                      : _generateCooldown
+                          ? 'Vui long cho...'
+                          : _hasGeneratedSuggestions
+                              ? 'Danh sach moi'
+                              : 'Tao so tai khoan'),
                 ),
               ),
             ],

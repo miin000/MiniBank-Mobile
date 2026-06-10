@@ -53,6 +53,7 @@ class AuthApi {
 
   Future<AuthOtpSendResponse> sendLoginOtp({
     required String phone,
+    required String password,
     required String deviceId,
     String? publicKeyPem,
   }) async {
@@ -65,6 +66,7 @@ class AuthApi {
           },
           body: jsonEncode({
             'identifier': phone,
+            'password': password,
             'deviceId': deviceId,
             'publicKey': publicKeyPem,
           }),

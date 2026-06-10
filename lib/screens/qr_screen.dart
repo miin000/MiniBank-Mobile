@@ -161,7 +161,7 @@ class _QrScreenState extends State<QrScreen> {
         if (!mounted) return;
         setState(() {
           _transferQr = latest;
-          if (latest.status == 'claimed' || latest.status == 'completed' || latest.status == 'expired') {
+          if (latest.status == 'completed' || latest.status == 'expired') {
             _pollTimer?.cancel();
           }
         });

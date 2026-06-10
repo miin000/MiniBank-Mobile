@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../api/account_api.dart';
 import '../api/authed_api.dart';
 import '../api/expense_api.dart';
+import '../api/notification_api.dart';
 import '../api/profile_api.dart';
 import '../api/transaction_api.dart';
 import '../auth/auth_api.dart';
@@ -58,7 +59,9 @@ class _HomeScreenState extends State<HomeScreen>
   String? _recentError;
   String? _aiRecommendationError;
   String? _profileStatus;
+  String? _profileFullName;
   int _profileAccountCount = 0;
+  int _unreadNotifications = 0;
   late AnimationController _balanceAnimCtrl;
   late Animation<double> _balanceFade;
 
@@ -85,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen>
       _loadRecent(),
       _loadProfile(),
       _loadAiRecommendation(),
+      _loadNotifications(),
     ]);
   }
 
@@ -103,9 +107,21 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   String _displayName() {
-    final user = _user;
-    if (user == null) return 'bạn';
-    return user.phone ?? user.username ?? 'bạn';
+    final profileName = _profileFullName?.trim();
+    if (profileName != null && profileName.isNotEmpty) return profileName;
+
+    // Không dùng username nếu username đang là SĐT/chuỗi số để tránh hiển thị
+    // "Chào 09xxxx" trên mobile. Khi chưa có hồ sơ tên, dùng lời chào trung tính.
+    final username = _user?.username?.trim();
+    final phone = _user?.phone?.trim();
+    final looksLikePhone = username != null && RegExp(r'^\+?\d{8,15}$').hasMatch(username);
+    if (username != null &&
+        username.isNotEmpty &&
+        username != phone &&
+        !looksLikePhone) {
+      return username;
+    }
+    return 'bạn';
   }
 
   void _comingSoon(String feature) {
@@ -255,7 +271,9 @@ class _HomeScreenState extends State<HomeScreen>
           storage: widget.storage,
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) _loadNotifications();
+    });
   }
 
   void _openAccountSetup() async {
@@ -281,6 +299,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
       setState(() {
         _profileStatus = profile.status;
+        _profileFullName = profile.fullName;
         _profileAccountCount = profile.accounts.length;
       });
     } catch (_) {
@@ -358,6 +377,19 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() => _aiRecommendationError = e.toString());
     } finally {
       if (mounted) setState(() => _loadingAiRecommendation = false);
+    }
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final api = NotificationApi(
+        api: AuthedApi(baseUrl: widget.baseUrl, storage: widget.storage),
+      );
+      final summary = await api.getSummary();
+      if (!mounted) return;
+      setState(() => _unreadNotifications = summary.unreadCount);
+    } catch (_) {
+      // Ignore notification errors silently to avoid blocking the home screen.
     }
   }
 
@@ -705,10 +737,44 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded),
-                    onPressed: _openNotifications,
-                    color: const Color(0xFF374151),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications_none_rounded),
+                        onPressed: _openNotifications,
+                        color: const Color(0xFF374151),
+                      ),
+                      if (_unreadNotifications > 0)
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: Text(
+                              _unreadNotifications > 99
+                                  ? '99+'
+                                  : '$_unreadNotifications',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.smart_toy_outlined),

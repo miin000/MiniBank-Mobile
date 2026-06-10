@@ -521,8 +521,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
 
   // ── Bar chart (trend) ───────────────────────────
   Widget _trendCard(ExpenseOverview ov) {
-    // Use monthly trend data if available, otherwise show placeholder
-    final months = ov.monthlyTrend ?? [];
+    final months = ov.monthlyTrend;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(

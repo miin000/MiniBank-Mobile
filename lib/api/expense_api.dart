@@ -233,7 +233,7 @@ class ExpenseApi {
         'flowType': flowType,
         'source': 'mobile',
       },
-      parser: (_) => null,
+      parser: (_) {},
     );
   }
 

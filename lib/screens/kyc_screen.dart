@@ -87,8 +87,10 @@ class _KycScreenState extends State<KycScreen> {
       final status = profile.status?.toLowerCase();
       setState(() {
         _status = profile.status;
-        _kycLocked = status == 'active' || status == 'pending';
-        _kycPending = status == 'pending';
+        // New users are stored as "pending" before KYC, so do not lock the form
+        // from user.status alone. Backend still prevents duplicate KYC requests.
+        _kycLocked = status == 'active';
+        _kycPending = false;
       });
     } catch (_) {}
   }
@@ -180,6 +182,20 @@ class _KycScreenState extends State<KycScreen> {
 
   Future<void> _submit() async {
     if (_kycLocked) { setState(() => _error = _kycPending ? 'Bạn đã gửi yêu cầu KYC. Vui lòng chờ admin duyệt.' : 'Tài khoản đã được duyệt KYC.'); return; }
+    final missingFields = <String>[];
+    if (_fullNameCtrl.text.trim().isEmpty) missingFields.add('Họ và tên');
+    if (_dobCtrl.text.trim().isEmpty) missingFields.add('Ngày sinh');
+    if (_citizenIdCtrl.text.trim().isEmpty) missingFields.add('Số CCCD');
+    if (_addressCtrl.text.trim().isEmpty) missingFields.add('Địa chỉ');
+    if (_occupationCtrl.text.trim().isEmpty) missingFields.add('Nghề nghiệp');
+    if (_monthlyIncomeCtrl.text.trim().isEmpty) missingFields.add('Thu nhập hàng tháng');
+    if (_otpCtrl.text.trim().isEmpty) missingFields.add('Mã OTP');
+    if (_citizenFrontImageUrl == null) missingFields.add('Ảnh CCCD mặt trước');
+    if (_citizenBackImageUrl == null) missingFields.add('Ảnh CCCD mặt sau');
+    if (_portraitImageUrl == null) missingFields.add('Ảnh chân dung');
+    if (missingFields.isNotEmpty) {
+      debugPrint('[KYC] Missing required fields: ${missingFields.join(', ')}');
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_citizenFrontImageUrl == null) { setState(() => _error = 'Vui lòng tải ảnh CCCD mặt trước.'); return; }
     if (_citizenBackImageUrl == null) { setState(() => _error = 'Vui lòng tải ảnh CCCD mặt sau.'); return; }
@@ -552,7 +568,7 @@ class _UploadField extends StatelessWidget {
               color: hasImage ? null : _gray100,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: hasImage ? _green.withOpacity(0.4) : _gray200,
+                color: hasImage ? _green.withValues(alpha: 0.4) : _gray200,
                 width: hasImage ? 1.5 : 1,
               ),
             ),
@@ -604,7 +620,7 @@ class _InfoBanner extends StatelessWidget {
     decoration: BoxDecoration(
       color: bgColor,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: color.withOpacity(0.2)),
+      border: Border.all(color: color.withValues(alpha: 0.2)),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
