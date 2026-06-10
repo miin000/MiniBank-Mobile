@@ -56,6 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _logLoginIssue(String reason, {String? detail}) {
+    debugPrint('[Mobile][Login] $reason | phone=${_phoneCtrl.text.trim()}${detail == null ? '' : ' | detail=$detail'}');
+  }
+
+  bool _isValidPhone(String value) => RegExp(r'^(0|\+84)\d{9}$').hasMatch(value);
+
   Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; _devOtpHint = null; });
@@ -79,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       });
     } catch (e) {
+      _logLoginIssue('Sai số điện thoại hoặc sai mật khẩu khi gửi OTP đăng nhập', detail: e.toString());
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
@@ -121,6 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      _logLoginIssue('Đăng nhập thất bại khi xác thực OTP', detail: e.toString());
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
@@ -220,7 +228,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                 hint: 'Nhập số điện thoại',
                                 prefix: const Icon(Icons.phone_rounded, size: 18, color: _gray400),
                               ),
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập số điện thoại' : null,
+                              validator: (v) {
+                                final phone = v?.trim() ?? '';
+                                if (phone.isEmpty) {
+                                  _logLoginIssue('Thiếu số điện thoại đăng nhập');
+                                  return 'Nhập số điện thoại';
+                                }
+                                if (!_isValidPhone(phone)) {
+                                  _logLoginIssue('Sai định dạng số điện thoại đăng nhập');
+                                  return 'Số điện thoại không hợp lệ';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 14),
 
@@ -240,7 +259,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
                               ),
-                              validator: (v) => (v == null || v.isEmpty) ? 'Nhập mật khẩu' : null,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  _logLoginIssue('Thiếu mật khẩu đăng nhập');
+                                  return 'Nhập mật khẩu';
+                                }
+                                return null;
+                              },
                             ),
 
                             if (_step == _LoginStep.credentials) ...[

@@ -470,20 +470,36 @@ class _HomeScreenState extends State<HomeScreen>
         : 'Quy tắc thông minh';
   }
 
+  RecommendationItem _fallbackRecommendationItem() {
+    if (_recent.where((tx) => tx.direction == 'out').isEmpty) {
+      return RecommendationItem(
+        type: 'START_TRACKING',
+        title: 'Bắt đầu theo dõi chi tiêu',
+        message: 'Hãy phân loại giao dịch chi tiêu để MiniBank đưa ra gợi ý phù hợp hơn.',
+        priority: 'LOW',
+      );
+    }
+    return RecommendationItem(
+      type: 'SMART_SAVE',
+      title: 'Duy trì ngân sách',
+      message: 'Theo dõi các khoản chi gần đây và dành một phần số dư cho tiết kiệm.',
+      priority: 'LOW',
+    );
+  }
+
+  List<RecommendationItem> _visibleRecommendationItems() {
+    final items = _aiRecommendation?.recommendations ?? const <RecommendationItem>[];
+    return items.isNotEmpty ? items : [_fallbackRecommendationItem()];
+  }
+
   Widget _buildAiAdvisorCard() {
     final recommendation = _aiRecommendation;
-    final firstItem = recommendation?.recommendations.isNotEmpty == true
-        ? recommendation!.recommendations.first
-        : null;
-    final accent = firstItem == null
-        ? const Color(0xFF7C3AED)
-        : _recommendationColor(firstItem.priority);
+    final firstItem = _visibleRecommendationItems().first;
+    final accent = _recommendationColor(firstItem.priority);
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: recommendation == null
-          ? _loadAiRecommendation
-          : _showAiRecommendationsSheet,
+      onTap: _loadingAiRecommendation ? null : _showAiRecommendationsSheet,
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
         padding: const EdgeInsets.all(16),
@@ -558,8 +574,8 @@ class _HomeScreenState extends State<HomeScreen>
                     _loadingAiRecommendation
                         ? 'Đang phân tích chi tiêu của bạn...'
                         : _aiRecommendationError != null
-                        ? 'Không tải được đề xuất. Nhấn để thử lại.'
-                        : firstItem?.message ?? 'Chưa có đề xuất chi tiêu mới.',
+                        ? 'Không tải được đề xuất từ máy chủ. Hiển thị gợi ý mặc định.'
+                        : firstItem.message,
                     style: TextStyle(
                       fontSize: 12,
                       color: accent.withOpacity(0.82),
@@ -591,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _showAiRecommendationsSheet() async {
     final recommendation = _aiRecommendation;
-    if (recommendation == null) return;
+    final items = _visibleRecommendationItems();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -606,7 +622,7 @@ class _HomeScreenState extends State<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Đề xuất chi tiêu ${recommendation.month}',
+                'Đề xuất chi tiêu ${recommendation?.month.isNotEmpty == true ? recommendation!.month : 'tháng này'}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -615,11 +631,11 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               const SizedBox(height: 6),
               Text(
-                '${_recommendationSourceLabel(recommendation.source)} • Điểm tiết kiệm ${recommendation.savingScore}/100',
+                '${_recommendationSourceLabel(recommendation?.source ?? 'RULE_BASED')} • Điểm tiết kiệm ${recommendation?.savingScore ?? 0}/100',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 14),
-              ...recommendation.recommendations.map((item) {
+              ...items.map((item) {
                 final color = _recommendationColor(item.priority);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),

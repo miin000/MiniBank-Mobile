@@ -49,6 +49,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  void _logRegisterIssue(String reason, {String? detail}) {
+    debugPrint(
+      '[Mobile][Register] $reason | phone=${_phoneCtrl.text.trim()} | email=${_emailCtrl.text.trim()}${detail == null ? '' : ' | detail=$detail'}',
+    );
+  }
+
+  bool _isValidPhone(String value) => RegExp(r'^(0|\+84)\d{9}$').hasMatch(value);
+
+  bool _isValidPassword(String value) => value.length >= 6;
+
+  String _classifyRegisterError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('phone') || message.contains('số điện thoại') || message.contains('sdt')) {
+      if (message.contains('exist') ||
+          message.contains('duplicate') ||
+          message.contains('already') ||
+          message.contains('trùng') ||
+          message.contains('tồn tại')) {
+        return 'Trùng số điện thoại khi đăng ký';
+      }
+      return 'Lỗi số điện thoại khi đăng ký';
+    }
+    if (message.contains('email')) {
+      if (message.contains('exist') ||
+          message.contains('duplicate') ||
+          message.contains('already') ||
+          message.contains('trùng') ||
+          message.contains('tồn tại')) {
+        return 'Trùng email khi đăng ký';
+      }
+      return 'Lỗi email khi đăng ký';
+    }
+    if (message.contains('password') || message.contains('mật khẩu')) {
+      return 'Sai dạng mật khẩu khi đăng ký';
+    }
+    return 'Đăng ký thất bại';
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
@@ -72,6 +110,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         (route) => false,
       );
     } catch (e) {
+      _logRegisterIssue(_classifyRegisterError(e), detail: e.toString());
+      if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -138,7 +178,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hint: '0901 234 567',
                         keyboardType: TextInputType.phone,
                         prefix: Icons.phone_rounded,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập số điện thoại' : null,
+                        validator: (v) {
+                          final phone = v?.trim() ?? '';
+                          if (phone.isEmpty) {
+                            _logRegisterIssue('Thiếu số điện thoại đăng ký');
+                            return 'Nhập số điện thoại';
+                          }
+                          if (!_isValidPhone(phone)) {
+                            _logRegisterIssue('Sai định dạng số điện thoại đăng ký');
+                            return 'Số điện thoại không hợp lệ';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -150,8 +201,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         keyboardType: TextInputType.emailAddress,
                         prefix: Icons.mail_rounded,
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Nhập email';
-                          if (!v.contains('@')) return 'Email không hợp lệ';
+                          if (v == null || v.trim().isEmpty) {
+                            _logRegisterIssue('Thiếu email đăng ký');
+                            return 'Nhập email';
+                          }
+                          if (!v.contains('@')) {
+                            _logRegisterIssue('Sai định dạng email đăng ký');
+                            return 'Email không hợp lệ';
+                          }
                           return null;
                         },
                       ),
@@ -181,8 +238,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Nhập mật khẩu';
-                          if (v.length < 6) return 'Mật khẩu tối thiểu 6 ký tự';
+                          if (v == null || v.isEmpty) {
+                            _logRegisterIssue('Thiếu mật khẩu đăng ký');
+                            return 'Nhập mật khẩu';
+                          }
+                          if (!_isValidPassword(v)) {
+                            _logRegisterIssue('Sai dạng mật khẩu đăng ký');
+                            return 'Mật khẩu tối thiểu 6 ký tự';
+                          }
                           return null;
                         },
                       ),

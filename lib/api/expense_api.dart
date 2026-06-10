@@ -29,15 +29,16 @@ class ExpenseCategorySummary {
 
 class MonthlyTrendItem {
   final String month;
+  final String label;
   final String amount;
 
-  String get label => month;
-
-  MonthlyTrendItem({required this.month, required this.amount});
+  MonthlyTrendItem({required this.month, required this.label, required this.amount});
 
   factory MonthlyTrendItem.fromJson(Map<String, dynamic> json) {
+    final month = (json['month'] ?? json['period'] ?? json['label'])?.toString() ?? '';
     return MonthlyTrendItem(
-      month: (json['month'] ?? json['label'] ?? json['period'])?.toString() ?? '',
+      month: month,
+      label: json['label']?.toString() ?? month,
       amount: (json['amount'] ?? json['total'])?.toString() ?? '0',
     );
   }

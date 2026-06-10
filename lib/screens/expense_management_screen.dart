@@ -206,6 +206,74 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
     return source == 'RULE_BASED_AND_GEMINI' ? 'Gemini AI' : 'Quy tắc thông minh';
   }
 
+  List<MonthlyTrendItem> _trendItemsFor(ExpenseOverview ov) {
+    final apiItems = ov.monthlyTrend
+        .where((item) => _asDouble(item.amount) > 0)
+        .toList(growable: false);
+    if (apiItems.isNotEmpty) return apiItems;
+
+    final direction = _flowTab == _FlowTab.expense ? 'out' : 'in';
+    final total = _recentTransactions
+        .where((tx) => tx.direction == direction && tx.status == 'completed')
+        .fold<double>(0, (sum, tx) => sum + _asDouble(tx.amount));
+    if (total <= 0) return const [];
+
+    final now = DateTime.now();
+    final label = '${now.month.toString().padLeft(2, '0')}/${(now.year % 100).toString().padLeft(2, '0')}';
+    return [
+      MonthlyTrendItem(
+        month: '${now.year}-${now.month.toString().padLeft(2, '0')}',
+        label: label,
+        amount: total.toStringAsFixed(0),
+      ),
+    ];
+  }
+
+  List<RecommendationItem> _fallbackRecommendations(ExpenseOverview? ov) {
+    final expense = _asDouble(ov?.totalExpense ?? '0');
+    final income = _asDouble(ov?.totalIncome ?? '0');
+    final categories = ov?.categories ?? const <ExpenseCategorySummary>[];
+    if (expense <= 0) {
+      return [
+        RecommendationItem(
+          type: 'START_TRACKING',
+          title: 'Bắt đầu theo dõi chi tiêu',
+          message: 'Hãy phân loại các giao dịch chi tiêu để MiniBank phân tích và đưa ra gợi ý chính xác hơn.',
+          priority: 'LOW',
+        ),
+      ];
+    }
+    if (income > 0 && expense >= income * 0.8) {
+      return [
+        RecommendationItem(
+          type: 'HIGH_SPENDING',
+          title: 'Chi tiêu đang cao',
+          message: 'Tổng chi đã gần bằng thu nhập. Bạn nên đặt hạn mức cho các khoản không thiết yếu trong tuần này.',
+          priority: 'HIGH',
+        ),
+      ];
+    }
+    if (categories.isNotEmpty) {
+      final top = categories.first;
+      return [
+        RecommendationItem(
+          type: 'TOP_CATEGORY',
+          title: 'Theo dõi ${top.categoryName}',
+          message: '${top.categoryName} đang là nhóm chi lớn nhất (${top.percentage}%). Hãy kiểm tra lại các khoản phát sinh trong nhóm này.',
+          priority: 'MEDIUM',
+        ),
+      ];
+    }
+    return [
+      RecommendationItem(
+        type: 'BALANCED',
+        title: 'Duy trì thói quen tốt',
+        message: 'Chi tiêu hiện chưa có dấu hiệu rủi ro cao. Tiếp tục theo dõi và dành một phần thu nhập cho tiết kiệm.',
+        priority: 'LOW',
+      ),
+    ];
+  }
+
   Future<void> _showCategoryPicker(TransactionSummary tx) async {
     if (_expenseCategories.isEmpty) return;
     await showModalBottomSheet<void>(
@@ -521,7 +589,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
 
   // ── Bar chart (trend) ───────────────────────────
   Widget _trendCard(ExpenseOverview ov) {
-    final months = ov.monthlyTrend;
+    final months = _trendItemsFor(ov);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(
@@ -741,14 +809,13 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
         child: _errorState(_recommendationError!, _loadRecommendations),
       );
     }
-    if (rec == null || rec.recommendations.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-            color: _C.surface, borderRadius: BorderRadius.circular(16)),
-        child: _emptyState(
-            'Chưa có đề xuất chi tiêu', Icons.auto_awesome_outlined),
-      );
-    }
+    final items = rec?.recommendations.isNotEmpty == true
+        ? rec!.recommendations
+        : _fallbackRecommendations(_expenseOverview);
+    final month = rec?.month.isNotEmpty == true ? rec!.month : 'tháng này';
+    final source = rec == null ? 'RULE_BASED' : rec.source;
+    final savingScore = rec?.savingScore ?? 0;
+    final riskLevel = rec?.riskLevel ?? 'LOW';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -784,7 +851,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
                         color: _C.textPrimary)),
                 const SizedBox(height: 2),
                 Text(
-                    '${_recommendationSourceLabel(rec.source)} • ${rec.month} • Điểm tiết kiệm ${rec.savingScore}/100',
+                    '${_recommendationSourceLabel(source)} • $month • Điểm tiết kiệm $savingScore/100',
                     style: const TextStyle(
                         fontSize: 11, color: _C.textSecondary)),
               ])),
@@ -792,18 +859,18 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-                color: _recommendationColor(rec.riskLevel)
+                color: _recommendationColor(riskLevel)
                     .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(999)),
-            child: Text(rec.riskLevel,
+            child: Text(riskLevel,
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: _recommendationColor(rec.riskLevel))),
+                    color: _recommendationColor(riskLevel))),
           ),
         ]),
         const SizedBox(height: 14),
-        ...rec.recommendations.map((item) {
+        ...items.map((item) {
           final color = _recommendationColor(item.priority);
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
